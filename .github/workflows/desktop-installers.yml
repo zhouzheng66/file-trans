@@ -84,6 +84,9 @@ jobs:
       - run: node scripts/run-core-tests-ci.mjs
       - name: Build installers
         run: npm run desktop:build -- --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+      - name: Verify macOS application signature
+        if: runner.os == 'macOS'
+        run: codesign --verify --deep --strict "target/${{ matrix.target }}/release/bundle/macos/File Trans.app"
       - name: Collect installers and checksums
         run: node scripts/collect-installers.mjs ${{ matrix.platform }} ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
