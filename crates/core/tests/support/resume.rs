@@ -45,14 +45,19 @@ pub async fn node(
     Engine::start(config, identity).await.unwrap()
 }
 
-pub async fn eventually(mut condition: impl FnMut() -> bool) {
-    timeout(Duration::from_secs(25), async {
-        while !condition() {
-            sleep(Duration::from_millis(10)).await;
-        }
-    })
-    .await
-    .expect("condition timed out");
+#[track_caller]
+#[allow(clippy::manual_async_fn)] // 在创建 future 时保存实际测试调用位置，不能在异步 poll 中取调用者。
+pub fn eventually(mut condition: impl FnMut() -> bool) -> impl std::future::Future<Output = ()> {
+    let caller = std::panic::Location::caller();
+    async move {
+        timeout(Duration::from_secs(25), async {
+            while !condition() {
+                sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap_or_else(|_| panic!("condition timed out at {caller}"));
+    }
 }
 
 pub async fn pair(a: &Arc<Engine>, b: &Arc<Engine>) -> Result<()> {

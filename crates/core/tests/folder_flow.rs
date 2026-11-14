@@ -51,6 +51,8 @@ async fn tree(root: &Path) -> Result<BTreeMap<String, String>> {
 async fn offer_folder(a: &Arc<Engine>, b: &Engine, root: &Path) -> Result<String> {
     let id = a.send_path(&b.local().id, root.into()).await?;
     eventually(|| {
+        let sent = activity(a, &id, "outgoing");
+        assert_ne!(sent.status, "failed", "folder preparation: {sent:?}");
         b.snapshot()
             .unwrap()
             .activities
@@ -62,9 +64,38 @@ async fn offer_folder(a: &Arc<Engine>, b: &Engine, root: &Path) -> Result<String
     b.decide_file_from(&a.local().id, &id, true)?;
     Ok(id)
 }
+async fn wait_task(
+    a: &Engine,
+    b: &Engine,
+    id: &str,
+    predicate: impl Fn(&file_trans_core::model::Activity) -> bool,
+) {
+    let result = tokio::time::timeout(std::time::Duration::from_secs(25), async {
+        loop {
+            let sent = activity(a, id, "outgoing");
+            assert_ne!(
+                sent.status,
+                "failed",
+                "source={sent:?}; receiver={:?}",
+                activity(b, id, "incoming")
+            );
+            if predicate(&sent) {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await;
+    assert!(
+        result.is_ok(),
+        "source={:?}; receiver={:?}",
+        activity(a, id, "outgoing"),
+        activity(b, id, "incoming")
+    );
+}
 async fn done(a: &Engine, b: &Engine, id: &str) {
-    eventually(|| {
-        ["completed", "failed", "rejected"].contains(&activity(a, id, "outgoing").status.as_str())
+    wait_task(a, b, id, |task| {
+        ["completed", "failed", "rejected"].contains(&task.status.as_str())
     })
     .await;
     assert_eq!(
@@ -208,8 +239,7 @@ async fn folder_snapshot_survives_pause_restart_and_live_lan_relay_migration() -
     a.set_network_settings(settings).await?;
     a.resume_transfer(key(&a, &b, &id, Direction::Outgoing))
         .await?;
-    eventually(|| {
-        let t = activity(&a, &id, "outgoing");
+    wait_task(&a, &b, &id, |t| {
         t.route == Some(Route::Relay) && t.resumed_from >= offset
     })
     .await;

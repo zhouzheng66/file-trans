@@ -43,7 +43,6 @@ pub(crate) async fn prepare(engine: &Engine, record: &Record) -> Result<bool> {
         tokio::io::AsyncWriteExt::flush(&mut output).await?;
         let (size, hash) = encoded?;
         output.sync_data().await.context("保存目录快照失败")?;
-        let modified = crate::transfers::source::modified(&output.metadata().await?);
         drop(output);
         if stop() {
             return Ok(false);
@@ -55,6 +54,8 @@ pub(crate) async fn prepare(engine: &Engine, record: &Record) -> Result<bool> {
             .persist(&path)
             .map_err(|error| error.error)
             .context("保存目录快照失败")?;
+        // 关闭全部写入句柄、完成重命名后再取时间戳，避免平台延迟更新时间造成误报。
+        let modified = crate::transfers::source::modified(&tokio::fs::metadata(&path).await?);
         let saved = engine.store.update_transfer(&record.key, |current| {
             ensure!(!current.cancelled, "目录任务已取消");
             current.source_path = Some(path.clone());
