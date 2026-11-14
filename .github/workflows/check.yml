@@ -19,7 +19,7 @@ jobs:
       - run: npm run build
       - run: npm run format:check
       - run: npm run test:ui
-      - run: npm run test:core
+      - run: node scripts/run-core-tests-ci.mjs
       - run: npm run check:rust
       - run: npm run lint:rust
       - run: node scripts/rust.mjs fmt --all -- --check

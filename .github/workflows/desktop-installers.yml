@@ -30,7 +30,7 @@ jobs:
       - run: npm run build
       - run: npm run format:check
       - run: npm run test:ui
-      - run: npm run test:core -- --locked
+      - run: node scripts/run-core-tests-ci.mjs
       - name: Verify Linux identity in a real Secret Service session
         run: dbus-run-session -- bash scripts/check-linux-identity.sh
       - run: node scripts/rust.mjs fmt --all --check
@@ -81,7 +81,7 @@ jobs:
       - run: npm ci
       - run: node scripts/release-version.mjs
       - run: npm run test:ui
-      - run: npm run test:core -- --locked
+      - run: node scripts/run-core-tests-ci.mjs
       - name: Build installers
         run: npm run desktop:build -- --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
       - name: Collect installers and checksums
