@@ -1238,7 +1238,7 @@ dependencies = [
 
 [[package]]
 name = "file-trans-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "file-trans-discovery",
@@ -1263,7 +1263,7 @@ dependencies = [
 
 [[package]]
 name = "file-trans-desktop"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "file-trans-core",
  "file-trans-identity",
@@ -1276,7 +1276,7 @@ dependencies = [
 
 [[package]]
 name = "file-trans-discovery"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "mdns-sd",
@@ -1287,7 +1287,7 @@ dependencies = [
 
 [[package]]
 name = "file-trans-identity"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "hex",
@@ -1301,7 +1301,7 @@ dependencies = [
 
 [[package]]
 name = "file-trans-protocol"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "serde",
@@ -1311,7 +1311,7 @@ dependencies = [
 
 [[package]]
 name = "file-trans-relay"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1328,7 +1328,7 @@ dependencies = [
 
 [[package]]
 name = "file-trans-relay-server"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "axum",

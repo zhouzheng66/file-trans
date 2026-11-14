@@ -26,14 +26,16 @@ export function Composer({ onSend, onChooseFile, onChooseFolder }: Props) {
   return (
     <div className="composer">
       <textarea
-        placeholder="输入文字，Ctrl / ⌘ + Enter 发送…"
+        placeholder="输入文字，Enter 发送，Shift + Enter 换行…"
         value={text}
         onChange={(event) => setText(event.target.value)}
         maxLength={65536}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+          if (event.key === 'Enter' && !event.shiftKey) {
+            // Safari 在中文选词结束时可能先结束 composition，再派发 keyCode 229。
+            if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
             event.preventDefault();
-            void send();
+            if (!event.repeat) void send();
           }
         }}
         aria-label="要发送的文字"
