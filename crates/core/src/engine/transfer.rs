@@ -98,16 +98,28 @@ impl Engine {
             !self.store.received(&id, peer_id)?,
             "该文件任务已经接收完成"
         );
-        let decision = self.receipts.register(&id)?;
+        let decision = if self.auto_accept_files {
+            None
+        } else {
+            Some(self.receipts.register(&id)?)
+        };
         let mut activity = Activity::new(id.clone(), peer_id, "incoming", "file", name, size);
-        activity.status = "awaiting_accept".into();
+        activity.status = if self.auto_accept_files {
+            "transferring"
+        } else {
+            "awaiting_accept"
+        }
+        .into();
         activity.route = Some(route);
         let result = async {
             self.record(&activity)?;
-            let accepted = timeout(self.decision_timeout, decision)
-                .await
-                .context("文件接收确认超时")?
-                .context("文件接收已取消")?;
+            let accepted = match decision {
+                Some(decision) => timeout(self.decision_timeout, decision)
+                    .await
+                    .context("文件接收确认超时")?
+                    .context("文件接收已取消")?,
+                None => true,
+            };
             self.store.peer(peer_id)?;
             timeout(
                 IO_TIMEOUT,
@@ -124,7 +136,9 @@ impl Engine {
             self.download(stream, &mut activity).await
         }
         .await;
-        self.receipts.remove(&id);
+        if !self.auto_accept_files {
+            self.receipts.remove(&id);
+        }
         if let Err(error) = &result {
             self.failed(&mut activity, error);
         }

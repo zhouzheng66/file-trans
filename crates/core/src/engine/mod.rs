@@ -33,6 +33,8 @@ pub struct EngineConfig {
     pub listen_address: SocketAddr,
     pub enable_discovery: bool,
     pub decision_timeout: Duration,
+    /// 自动接收已配对设备的文件和文件夹；不影响首次配对确认。
+    pub auto_accept_files: bool,
     pub network: Option<NetworkSettings>,
     pub relay_url: Option<String>,
 }
@@ -46,6 +48,7 @@ impl EngineConfig {
             listen_address: SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0),
             enable_discovery: true,
             decision_timeout: Duration::from_secs(120),
+            auto_accept_files: false,
             network: None,
             relay_url: None,
         }
@@ -64,6 +67,7 @@ pub struct Engine {
     pub(crate) live: Mutex<HashMap<String, Activity>>,
     pub(crate) cancel: CancellationToken,
     pub(crate) decision_timeout: Duration,
+    pub(crate) auto_accept_files: bool,
     pub(crate) outbound: Arc<Semaphore>,
     discovery: Mutex<Option<Discovery>>,
     discovery_error: Option<String>,
@@ -135,6 +139,7 @@ impl Engine {
             live: Mutex::new(HashMap::new()),
             cancel: CancellationToken::new(),
             decision_timeout: config.decision_timeout,
+            auto_accept_files: config.auto_accept_files,
             outbound: Arc::new(Semaphore::new(4)),
             discovery: Mutex::new(discovery),
             discovery_error,
@@ -248,6 +253,11 @@ impl Engine {
     pub async fn set_download_dir(&self, path: PathBuf) -> Result<()> {
         ensure!(path.is_absolute(), "接收目录必须为绝对路径");
         tokio::fs::create_dir_all(&path).await?;
+        let probe = tempfile::Builder::new()
+            .prefix(".file-trans-write-check-")
+            .tempfile_in(&path)
+            .context("接收目录不可写，请选择有写入权限的目录")?;
+        drop(probe);
         self.store
             .set_setting("download_dir", &path.to_string_lossy())?;
         *self.download_dir.lock().unwrap() = path;

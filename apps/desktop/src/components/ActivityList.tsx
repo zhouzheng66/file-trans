@@ -1,4 +1,12 @@
-import { CheckCheck, Copy, File, Folder, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import {
+  CheckCheck,
+  Copy,
+  File,
+  Folder,
+  FolderOpen,
+  ArrowDownLeft,
+  ArrowUpRight,
+} from 'lucide-react';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import type { Activity, Peer } from '../types';
 import { useEffect, useRef } from 'react';
@@ -18,7 +26,7 @@ export function formatSize(bytes: number): string {
 
 const statuses: Record<string, string> = {
   connecting: '正在连接',
-  awaiting_accept: '等待接收确认',
+  awaiting_accept: '等待对端接收',
   transferring: '传输中',
   verifying: '正在校验并保存',
   completed: '已完成',
@@ -34,14 +42,14 @@ const statuses: Record<string, string> = {
 interface Props {
   activities: Activity[];
   peers: Peer[];
-  onDecide: (activity: Activity, accepted: boolean) => void;
   onError: (message: string) => void;
+  onReveal: (activity: Activity) => Promise<unknown>;
   onTransferAction: (
     activity: Activity,
     action: 'pause_transfer' | 'resume_transfer' | 'cancel_transfer',
   ) => void;
 }
-export function ActivityList({ activities, peers, onDecide, onError, onTransferAction }: Props) {
+export function ActivityList({ activities, peers, onError, onReveal, onTransferAction }: Props) {
   const end = useRef<HTMLDivElement>(null);
   const latest = activities.at(-1)?.id;
   useEffect(() => {
@@ -134,19 +142,22 @@ export function ActivityList({ activities, peers, onDecide, onError, onTransferA
                 {activity.status === 'completed' && <CheckCheck className="success" size={19} />}
               </div>
             )}
-            {incoming && activity.kind !== 'text' && activity.status === 'awaiting_accept' && (
-              <div className="receipt-actions">
-                <button
-                  className="button secondary small"
-                  onClick={() => onDecide(activity, false)}
-                >
-                  拒绝
-                </button>
-                <button className="button primary small" onClick={() => onDecide(activity, true)}>
-                  {activity.kind === 'folder' ? '接收文件夹' : '接收文件'}
-                </button>
-              </div>
-            )}
+            {incoming &&
+              activity.kind !== 'text' &&
+              activity.status === 'completed' &&
+              activity.path && (
+                <div className="transfer-actions">
+                  <button
+                    className="button secondary small"
+                    onClick={() => {
+                      void onReveal(activity).catch((error) => onError(String(error)));
+                    }}
+                  >
+                    <FolderOpen size={14} />
+                    打开所在位置
+                  </button>
+                </div>
+              )}
             {activity.kind === 'text' && (
               <small className={`delivery ${activity.status === 'failed' ? 'failure' : ''}`}>
                 {statuses[activity.status] ?? activity.status}

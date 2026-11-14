@@ -105,14 +105,21 @@
 .download-location {
   display: flex;
   align-items: center;
-  gap: 6px;
   min-width: 0;
+  flex: 1;
+  gap: 10px;
+  color: #667b73;
+  font-size: 11px;
+}
+.download-location > svg,
+.download-location > button {
+  flex-shrink: 0;
 }
 .download-location span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 380px;
+  min-width: 0;
 }
 .main-footer > span {
   flex-shrink: 0;

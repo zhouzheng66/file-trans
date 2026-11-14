@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ask, open } from '@tauri-apps/plugin-dialog';
-import { ArrowDownUp, FolderOpen, Link2, ShieldCheck, X } from 'lucide-react';
+import { ArrowDownUp, Link2, ShieldCheck, X } from 'lucide-react';
 import { useEngine } from './hooks/useEngine';
 import { useDropFiles } from './hooks/useDropFiles';
 import { sendPaths } from './hooks/sendPaths';
@@ -10,6 +10,7 @@ import { DeviceSidebar } from './components/DeviceSidebar';
 import { Composer } from './components/Composer';
 import { Welcome } from './components/Welcome';
 import { NetworkPanel } from './components/NetworkPanel';
+import { ReceiveDirectory } from './components/ReceiveDirectory';
 import './styles.css';
 
 function ignore(promise: Promise<unknown>) {
@@ -28,13 +29,6 @@ export default function App() {
   );
   const activities =
     snapshot?.activities.filter((activity) => activity.peerId === peer?.id).reverse() ?? [];
-  const pendingElsewhere =
-    snapshot?.activities.filter(
-      (activity) =>
-        activity.direction === 'incoming' &&
-        activity.status === 'awaiting_accept' &&
-        activity.peerId !== selected,
-    ) ?? [];
 
   useEffect(() => {
     if (snapshot && !snapshot.peers.some((peer) => peer.id === selected))
@@ -69,14 +63,6 @@ export default function App() {
       });
       if (paths)
         await sendPaths(typeof paths === 'string' ? [paths] : paths, peerId, run, setError);
-    } catch (error) {
-      setError(String(error));
-    }
-  }
-  async function chooseDirectory() {
-    try {
-      const path = await open({ directory: true, multiple: false, title: '选择文件接收目录' });
-      if (path) await run('set_download_dir', { path });
     } catch (error) {
       setError(String(error));
     }
@@ -146,13 +132,6 @@ export default function App() {
               与 {pairing.peer.name} 的配对已取消。
             </div>
           ))}
-        {pendingElsewhere.length > 0 && (
-          <div className="notice-banner">
-            <button className="text-button" onClick={() => setSelected(pendingElsewhere[0].peerId)}>
-              另有 {pendingElsewhere.length} 个传输任务等待接收，点击查看
-            </button>
-          </div>
-        )}
         <div className="conversation">
           {peer ? (
             <>
@@ -172,12 +151,10 @@ export default function App() {
                 <ActivityList
                   activities={activities}
                   peers={snapshot!.peers}
-                  onDecide={(activity, accepted) =>
-                    ignore(
-                      run('decide_file', { id: activity.id, peerId: activity.peerId, accepted }),
-                    )
-                  }
                   onError={setError}
+                  onReveal={(activity) =>
+                    run('open_received_location', { id: activity.id, peerId: activity.peerId })
+                  }
                   onTransferAction={(activity, command) =>
                     ignore(
                       run(command, {
@@ -210,18 +187,11 @@ export default function App() {
             onChooseFolder={() => ignore(choosePaths(true))}
           />
         )}
-        <footer className="main-footer">
-          <button
-            className="text-button download-location"
-            disabled={!snapshot}
-            title={snapshot?.downloadDir}
-            onClick={() => ignore(chooseDirectory())}
-          >
-            <FolderOpen size={14} />
-            <span>接收目录：{snapshot?.downloadDir ?? '正在读取…'}</span>
-          </button>
-          <span>双方在线即可收发</span>
-        </footer>
+        <ReceiveDirectory
+          path={snapshot?.downloadDir}
+          onChange={(path) => run('set_download_dir', { path })}
+          onError={setError}
+        />
         {dragging && (
           <div className="drop-overlay">
             <ArrowDownUp size={45} />

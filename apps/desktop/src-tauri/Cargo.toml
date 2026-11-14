@@ -12,6 +12,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-clipboard-manager = "2"
+tauri-plugin-opener = "2"
 file-trans-core.workspace = true
 file-trans-identity.workspace = true
 hostname = "0.4"

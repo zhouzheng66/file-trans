@@ -15,6 +15,18 @@ impl Engine {
             tracing::warn!(%error, "回收未引用的目录快照失败");
         }
         for record in records {
+            if self.auto_accept_files
+                && record.key.direction == Direction::Incoming
+                && !record.terminal()
+                && !record.accepted
+                && self.store.peer(&record.key.peer_id).is_ok()
+            {
+                self.store.update_transfer(&record.key, |record| {
+                    record.accepted = true;
+                    record.state("waiting_connection");
+                    Ok(())
+                })?;
+            }
             if record.key.direction == Direction::Incoming
                 && record.is_folder()
                 && ["completed", "cancelled"].contains(&record.activity.status.as_str())

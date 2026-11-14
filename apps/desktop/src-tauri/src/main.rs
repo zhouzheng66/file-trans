@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod received_files;
 
 use file_trans_core::{Engine, EngineConfig};
 use file_trans_identity::Identity;
@@ -13,6 +14,11 @@ fn main() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(
+            tauri_plugin_opener::Builder::new()
+                .open_js_links_on_click(false)
+                .build(),
+        )
         .setup(|app| {
             let data = std::env::var_os("FILE_TRANS_DATA_DIR")
                 .map(PathBuf::from)
@@ -27,6 +33,7 @@ fn main() {
             });
             let identity = Identity::load_or_create(&data)?;
             let mut config = EngineConfig::new(data, downloads, name);
+            config.auto_accept_files = true;
             config.relay_url = std::env::var("FILE_TRANS_RELAY_URL").ok();
             let engine = tauri::async_runtime::block_on(Engine::start(config, identity))?;
             app.manage(AppState(engine));
@@ -47,7 +54,8 @@ fn main() {
             commands::resume_transfer,
             commands::cancel_transfer,
             commands::forget_peer,
-            commands::set_download_dir
+            commands::set_download_dir,
+            received_files::open_received_location
         ])
         .build(tauri::generate_context!())
         .expect("File Trans 启动失败，请检查系统凭据库、本地网络和接收目录权限");

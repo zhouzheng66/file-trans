@@ -55,7 +55,12 @@ impl Engine {
                 record.activity.kind = "folder".into();
             }
             record.sha256 = Some(digest);
-            record.activity.status = "awaiting_accept".into();
+            record.accepted = self.auto_accept_files;
+            record.state(if record.accepted {
+                "waiting_connection"
+            } else {
+                "awaiting_accept"
+            });
             record.destination = Some(self.download_dir.lock().unwrap().clone());
             record.activity.route = Some(route);
             self.store.insert_transfer(&record)?;
@@ -98,6 +103,7 @@ impl Engine {
             return Ok(None);
         }
         record = self.store.update_transfer(key, |record| {
+            record.accepted |= self.auto_accept_files;
             record.peer_paused = false;
             record.activity.route = Some(route);
             record.state(if record.accepted {

@@ -119,12 +119,6 @@
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
-.receipt-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 9px;
-}
 .transfer-actions {
   display: flex;
   justify-content: flex-end;
