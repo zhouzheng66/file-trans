@@ -68,9 +68,10 @@ async fn wait_task(
     a: &Engine,
     b: &Engine,
     id: &str,
+    wait: std::time::Duration,
     predicate: impl Fn(&file_trans_core::model::Activity) -> bool,
 ) {
-    let result = tokio::time::timeout(std::time::Duration::from_secs(25), async {
+    let result = tokio::time::timeout(wait, async {
         loop {
             let sent = activity(a, id, "outgoing");
             assert_ne!(
@@ -94,7 +95,8 @@ async fn wait_task(
     );
 }
 async fn done(a: &Engine, b: &Engine, id: &str) {
-    wait_task(a, b, id, |task| {
+    // 仅放宽大文件完成预算；握手和状态切换仍采用 25 秒预算。
+    wait_task(a, b, id, std::time::Duration::from_secs(90), |task| {
         ["completed", "failed", "rejected"].contains(&task.status.as_str())
     })
     .await;
@@ -239,7 +241,7 @@ async fn folder_snapshot_survives_pause_restart_and_live_lan_relay_migration() -
     a.set_network_settings(settings).await?;
     a.resume_transfer(key(&a, &b, &id, Direction::Outgoing))
         .await?;
-    wait_task(&a, &b, &id, |t| {
+    wait_task(&a, &b, &id, std::time::Duration::from_secs(25), |t| {
         t.route == Some(Route::Relay) && t.resumed_from >= offset
     })
     .await;

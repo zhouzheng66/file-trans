@@ -46,11 +46,19 @@ pub async fn node(
 }
 
 #[track_caller]
+pub fn eventually(condition: impl FnMut() -> bool) -> impl std::future::Future<Output = ()> {
+    eventually_within(Duration::from_secs(25), condition)
+}
+
+#[track_caller]
 #[allow(clippy::manual_async_fn)] // 在创建 future 时保存实际测试调用位置，不能在异步 poll 中取调用者。
-pub fn eventually(mut condition: impl FnMut() -> bool) -> impl std::future::Future<Output = ()> {
+fn eventually_within(
+    wait: Duration,
+    mut condition: impl FnMut() -> bool,
+) -> impl std::future::Future<Output = ()> {
     let caller = std::panic::Location::caller();
     async move {
-        timeout(Duration::from_secs(25), async {
+        timeout(wait, async {
             while !condition() {
                 sleep(Duration::from_millis(10)).await;
             }
@@ -129,7 +137,8 @@ pub async fn offer(a: &Arc<Engine>, b: &Engine, path: &Path) -> Result<String> {
 }
 
 pub async fn finished(a: &Engine, b: &Engine, id: &str, original: &Path) -> Result<()> {
-    eventually(|| {
+    // 云主机定时器合并可能让每个代理数据块的 4ms 延迟扩大；完成等待需覆盖 64 MiB。
+    eventually_within(Duration::from_secs(90), || {
         ["completed", "failed", "rejected"].contains(&activity(a, id, "outgoing").status.as_str())
     })
     .await;
