@@ -22,11 +22,15 @@ child.on('error', (error) => {
 });
 child.on('close', (code) => {
   if (code !== 0 && process.env.GITHUB_ACTIONS === 'true') {
-    const message = tail
-      .replace(/\u001b\[[0-9;]*m/g, '')
-      .split('\n')
-      .slice(-140)
-      .join('\n')
+    const message = Buffer.from(
+      tail
+        .replace(/\u001b\[[0-9;]*m/g, '')
+        .split('\n')
+        .slice(-80)
+        .join('\n'),
+    )
+      .subarray(-3000)
+      .toString('utf8')
       .replaceAll('%', '%25')
       .replaceAll('\r', '%0D')
       .replaceAll('\n', '%0A');
