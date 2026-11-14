@@ -43,6 +43,8 @@
   color: #7a878a;
 }
 .version {
+  flex-shrink: 0;
+  white-space: nowrap;
   font-size: 9px;
   letter-spacing: 1px;
   margin-left: auto;

@@ -10,6 +10,7 @@ import {
   Wifi,
 } from 'lucide-react';
 import type { Snapshot } from '../types';
+import { version } from '../../package.json';
 
 interface Props {
   snapshot: Snapshot | null;
@@ -45,7 +46,13 @@ export function DeviceSidebar({
           <strong>轻传</strong>
           <span>FILE TRANS</span>
         </div>
-        <span className="version">LINK</span>
+        <span
+          className="version"
+          title={`当前版本 v${version}`}
+          aria-label={`当前版本 v${version}`}
+        >
+          v{version}
+        </span>
       </div>
       <div className="local-device">
         <div className="local-device-icon">
