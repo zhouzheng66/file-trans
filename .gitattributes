@@ -1,0 +1,6 @@
+# 在 Windows 和 macOS 上统一源码换行，避免格式检查受 Git 自动转换影响。
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.icns binary
