@@ -1,21 +1,15 @@
 use super::{validate_id, Engine, IO_TIMEOUT};
 use crate::{
     files::{persist_without_overwrite, safe_file_name},
-    model::Activity,
+    model::{Activity, Route},
 };
 use anyhow::{ensure, Context, Result};
 use file_trans_identity::TlsStream;
 use file_trans_protocol::{
-    read_frame, read_message, write_chunk, write_message, Frame, Message, CHUNK_SIZE, MAX_TEXT,
-    VERSION,
+    read_frame, read_message, write_message, Frame, Message, MAX_TEXT, VERSION,
 };
 use sha2::{Digest, Sha256};
-use std::{path::PathBuf, sync::Arc};
-use tokio::{
-    fs::File,
-    io::{AsyncReadExt, AsyncWriteExt},
-    time::timeout,
-};
+use tokio::{fs::File, io::AsyncWriteExt, time::timeout};
 use uuid::Uuid;
 
 impl Engine {
@@ -39,7 +33,10 @@ impl Engine {
         let result = tokio::select! {
             _ = self.cancel.cancelled() => Err(anyhow::anyhow!("应用已退出")),
             result = timeout(IO_TIMEOUT, async {
-                let mut stream = self.open_peer(peer_id).await?;
+                let connection = self.open_peer(peer_id).await?;
+                activity.route = Some(connection.route);
+                self.record(&activity)?;
+                let mut stream = connection.stream;
                 write_message(&mut stream, &Message::Text { version: VERSION, id: id.clone(), text }).await?;
                 ensure_ack(&mut stream, &id).await
             }) => result.context("文字发送超时").and_then(|result| result),
@@ -59,6 +56,7 @@ impl Engine {
         peer_id: &str,
         id: String,
         text: String,
+        route: Route,
     ) -> Result<()> {
         validate_id(&id)?;
         ensure!(
@@ -74,120 +72,11 @@ impl Engine {
             text.len() as u64,
         );
         activity.status = "completed".into();
+        activity.route = Some(route);
         activity.transferred = activity.size;
         self.store.receive_text(&activity)?;
         timeout(IO_TIMEOUT, write_message(stream, &Message::Ack { id })).await??;
         Ok(())
-    }
-
-    pub async fn send_file(self: &Arc<Self>, peer_id: &str, path: PathBuf) -> Result<String> {
-        self.store.peer(peer_id)?;
-        let permit = self.outbound_permit().await?;
-        let file = File::open(&path).await.context("无法打开源文件")?;
-        let metadata = file.metadata().await?;
-        ensure!(metadata.is_file(), "请选择普通文件，当前不支持文件夹");
-        let name = path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .context("文件名称不是有效 Unicode")?
-            .to_owned();
-        safe_file_name(&name)?;
-        let id = Uuid::new_v4().to_string();
-        let mut activity = Activity::new(
-            id.clone(),
-            peer_id,
-            "outgoing",
-            "file",
-            name,
-            metadata.len(),
-        );
-        activity.path = Some(path.to_string_lossy().into_owned());
-        self.record(&activity)?;
-        let engine = Arc::clone(self);
-        tokio::spawn(async move {
-            let _permit = permit;
-            let result = tokio::select! {
-                _ = engine.cancel.cancelled() => Err(anyhow::anyhow!("应用已退出")),
-                result = engine.upload(&mut activity, file) => result,
-            };
-            if let Err(error) = result {
-                engine.failed(&mut activity, &error);
-            }
-        });
-        Ok(id)
-    }
-
-    async fn upload(&self, activity: &mut Activity, mut file: File) -> Result<()> {
-        let mut stream = self.open_peer(&activity.peer_id).await?;
-        activity.status = "awaiting_accept".into();
-        self.record(activity)?;
-        timeout(
-            IO_TIMEOUT,
-            write_message(
-                &mut stream,
-                &Message::FileOffer {
-                    version: VERSION,
-                    id: activity.id.clone(),
-                    name: activity.content.clone(),
-                    size: activity.size,
-                },
-            ),
-        )
-        .await??;
-        let response = timeout(
-            self.decision_timeout + IO_TIMEOUT,
-            read_message(&mut stream),
-        )
-        .await
-        .context("等待接收确认超时")??;
-        let Message::FileDecision { accepted } = response else {
-            anyhow::bail!("无效文件接收响应")
-        };
-        if !accepted {
-            activity.status = "rejected".into();
-            self.record(activity)?;
-            return Ok(());
-        }
-        activity.status = "transferring".into();
-        self.record(activity)?;
-        let mut buffer = vec![0; CHUNK_SIZE];
-        let mut hash = Sha256::new();
-        loop {
-            let length = timeout(IO_TIMEOUT, file.read(&mut buffer)).await??;
-            if length == 0 {
-                break;
-            }
-            ensure!(
-                activity.transferred + length as u64 <= activity.size,
-                "发送过程中源文件大小发生变化"
-            );
-            timeout(IO_TIMEOUT, write_chunk(&mut stream, &buffer[..length]))
-                .await
-                .context("发送文件块超时")??;
-            hash.update(&buffer[..length]);
-            activity.transferred += length as u64;
-            self.progress(activity);
-        }
-        ensure!(
-            activity.transferred == activity.size,
-            "发送过程中源文件被截断"
-        );
-        activity.status = "verifying".into();
-        self.record(activity)?;
-        timeout(IO_TIMEOUT, async {
-            write_message(
-                &mut stream,
-                &Message::FileEnd {
-                    sha256: hex::encode(hash.finalize()),
-                },
-            )
-            .await?;
-            ensure_ack(&mut stream, &activity.id).await
-        })
-        .await
-        .context("等待文件保存确认超时")??;
-        activity.status = "completed".into();
-        self.record(activity)
     }
 
     pub(crate) async fn receive_file(
@@ -197,6 +86,7 @@ impl Engine {
         id: String,
         name: String,
         size: u64,
+        route: Route,
     ) -> Result<()> {
         validate_id(&id)?;
         let name = safe_file_name(&name)?;
@@ -211,6 +101,7 @@ impl Engine {
         let decision = self.receipts.register(&id)?;
         let mut activity = Activity::new(id.clone(), peer_id, "incoming", "file", name, size);
         activity.status = "awaiting_accept".into();
+        activity.route = Some(route);
         let result = async {
             self.record(&activity)?;
             let accepted = timeout(self.decision_timeout, decision)

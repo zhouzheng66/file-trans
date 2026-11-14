@@ -125,3 +125,9 @@
   gap: 8px;
   margin-top: 9px;
 }
+.transfer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: 8px;
+}

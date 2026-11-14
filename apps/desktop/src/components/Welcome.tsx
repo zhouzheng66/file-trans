@@ -28,7 +28,7 @@ export function Welcome({ onAdd }: { onAdd: () => void }) {
         <span>就这么简单。</span>
       </h2>
       <p>
-        无需账号，同一局域网内直接传输。
+        无需账号，局域网优先，也能跨互联网传输。
         <br />
         文件、图片、视频，或只是你想带走的一段文字。
       </p>

@@ -26,20 +26,26 @@ fn main() {
                     .unwrap_or_else(|_| "我的电脑".into())
             });
             let identity = Identity::load_or_create(&data)?;
-            let engine = tauri::async_runtime::block_on(Engine::start(
-                EngineConfig::new(data, downloads, name),
-                identity,
-            ))?;
+            let mut config = EngineConfig::new(data, downloads, name);
+            config.relay_url = std::env::var("FILE_TRANS_RELAY_URL").ok();
+            let engine = tauri::async_runtime::block_on(Engine::start(config, identity))?;
             app.manage(AppState(engine));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_snapshot,
+            commands::set_network_settings,
+            commands::create_invite,
+            commands::pair_by_code,
             commands::pair_device,
             commands::decide_pairing,
             commands::decide_file,
             commands::send_text,
             commands::send_file,
+            commands::send_path,
+            commands::pause_transfer,
+            commands::resume_transfer,
+            commands::cancel_transfer,
             commands::forget_peer,
             commands::set_download_dir
         ])

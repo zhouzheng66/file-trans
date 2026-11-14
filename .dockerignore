@@ -1,0 +1,6 @@
+.git
+.tooling
+node_modules
+target
+apps/desktop/dist
+.local-data

@@ -14,12 +14,18 @@ uuid.workspace = true
 sha2.workspace = true
 hex.workspace = true
 tracing.workspace = true
+futures-util.workspace = true
 file-trans-protocol.workspace = true
 file-trans-identity.workspace = true
 file-trans-discovery.workspace = true
+file-trans-relay.workspace = true
 rusqlite = { version = "0.37", features = ["bundled"] }
 tempfile = "3"
 if-addrs = "0.14"
 
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1", features = ["fs"] }
+
 [dev-dependencies]
 tempfile = "3"
+file-trans-relay-server.workspace = true

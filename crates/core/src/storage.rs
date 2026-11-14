@@ -2,6 +2,7 @@ use crate::model::{Activity, Peer};
 use anyhow::{ensure, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::{path::Path, sync::Mutex};
+mod transfers;
 
 pub struct Store(Mutex<Connection>);
 
@@ -14,12 +15,15 @@ impl Store {
             CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);")?;
         let store = Self(Mutex::new(connection));
         for mut activity in store.activities()? {
-            if !["completed", "failed", "rejected"].contains(&activity.status.as_str()) {
+            if !activity.resumable
+                && !["completed", "failed", "rejected"].contains(&activity.status.as_str())
+            {
                 activity.status = "failed".into();
                 activity.error = Some("上次运行已中断，请重新发送".into());
                 store.save_activity(&activity)?;
             }
         }
+        store.init_transfers()?;
         Ok(store)
     }
 
@@ -66,7 +70,7 @@ impl Store {
     pub fn activities(&self) -> Result<Vec<Activity>> {
         let db = self.0.lock().unwrap();
         let mut query =
-            db.prepare("SELECT data FROM activities ORDER BY timestamp DESC LIMIT 200")?;
+            db.prepare("SELECT data FROM activities ORDER BY CASE WHEN json_extract(data,'$.status') IN ('completed','failed','rejected','cancelled') THEN 1 ELSE 0 END, timestamp DESC LIMIT 328")?;
         let records = query
             .query_map([], |row| row.get::<_, String>(0))?
             .collect::<std::result::Result<Vec<_>, _>>()?;

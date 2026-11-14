@@ -8,10 +8,13 @@ use rustls::{
     DigitallySignedStruct, DistinguishedName, Error, SignatureScheme,
 };
 use std::sync::Arc;
-use tokio::net::TcpStream;
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_rustls::TlsConnector;
 
-pub type TlsStream = tokio_rustls::TlsStream<TcpStream>;
+pub trait Transport: AsyncRead + AsyncWrite + Send + Unpin {}
+impl<T: AsyncRead + AsyncWrite + Send + Unpin> Transport for T {}
+pub type BoxedStream = Box<dyn Transport>;
+pub type TlsStream = tokio_rustls::TlsStream<BoxedStream>;
 
 // 自签名证书引导：保留 TLS 的签名验证；业务层另行执行配对授权。
 #[derive(Debug)]
@@ -127,8 +130,8 @@ pub fn server_config(identity: &Identity) -> Result<Arc<rustls::ServerConfig>> {
     ))
 }
 
-pub async fn connect(
-    stream: TcpStream,
+pub async fn connect<S: Transport + 'static>(
+    stream: S,
     identity: &Identity,
     expected_id: Option<&str>,
 ) -> Result<TlsStream> {
@@ -140,7 +143,10 @@ pub async fn connect(
         }))
         .with_client_auth_cert(certificate(identity), private_key(identity))?;
     let stream = TlsConnector::from(Arc::new(config))
-        .connect(ServerName::try_from("file-trans.local")?, stream)
+        .connect(
+            ServerName::try_from("file-trans.local")?,
+            Box::new(stream) as BoxedStream,
+        )
         .await?;
     Ok(TlsStream::Client(stream))
 }

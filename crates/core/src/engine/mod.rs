@@ -1,3 +1,4 @@
+mod network;
 mod pairing;
 mod server;
 mod transfer;
@@ -5,13 +6,14 @@ mod transport;
 
 use crate::{
     decisions::{Pairings, Receipts},
-    model::{Activity, Snapshot},
+    model::{Activity, NetworkSettings, Snapshot},
     storage::Store,
 };
 use anyhow::{ensure, Context, Result};
 use file_trans_discovery::Discovery;
 use file_trans_identity::Identity;
 use file_trans_protocol::Device;
+use file_trans_relay::{IncomingTunnel, RelayClient};
 use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -31,6 +33,8 @@ pub struct EngineConfig {
     pub listen_address: SocketAddr,
     pub enable_discovery: bool,
     pub decision_timeout: Duration,
+    pub network: Option<NetworkSettings>,
+    pub relay_url: Option<String>,
 }
 
 impl EngineConfig {
@@ -42,6 +46,8 @@ impl EngineConfig {
             listen_address: SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0),
             enable_discovery: true,
             decision_timeout: Duration::from_secs(120),
+            network: None,
+            relay_url: None,
         }
     }
 }
@@ -52,15 +58,23 @@ pub struct Engine {
     pub(crate) address: SocketAddr,
     pub(crate) store: Store,
     pub(crate) download_dir: Mutex<PathBuf>,
+    pub(crate) transfer_cache: PathBuf,
     pub(crate) pairings: Pairings,
     pub(crate) receipts: Receipts,
     pub(crate) live: Mutex<HashMap<String, Activity>>,
     pub(crate) cancel: CancellationToken,
     pub(crate) decision_timeout: Duration,
-    outbound: Arc<Semaphore>,
+    pub(crate) outbound: Arc<Semaphore>,
     discovery: Mutex<Option<Discovery>>,
     discovery_error: Option<String>,
     server_task: Mutex<Option<JoinHandle<()>>>,
+    network: Mutex<NetworkSettings>,
+    relay: Mutex<Option<RelayClient>>,
+    network_updates: tokio::sync::Mutex<()>,
+    relay_events: tokio::sync::mpsc::Sender<IncomingTunnel>,
+    relay_task: Mutex<Option<JoinHandle<()>>>,
+    pub(crate) transfers: Arc<crate::transfers::runtime::Runtime>,
+    pub(crate) route_revision: tokio::sync::watch::Sender<u64>,
 }
 
 impl Engine {
@@ -68,6 +82,18 @@ impl Engine {
         validate_name(&config.name)?;
         tokio::fs::create_dir_all(&config.data_dir).await?;
         let store = Store::open(&config.data_dir.join("file-trans.db"))?;
+        let mut network = match config.network {
+            Some(network) => network,
+            None => store
+                .setting("network")?
+                .map(|json| serde_json::from_str(&json))
+                .transpose()?
+                .unwrap_or_default(),
+        };
+        if let Some(url) = config.relay_url {
+            network.relay_url = url;
+        }
+        let network = network::validate_settings(network)?;
         let download_dir = store
             .setting("download_dir")?
             .map(PathBuf::from)
@@ -96,12 +122,14 @@ impl Engine {
             (None, None)
         };
         let tls = file_trans_identity::server_config(&identity)?;
+        let (relay_events, receiver) = tokio::sync::mpsc::channel(16);
         let engine = Arc::new(Self {
             identity,
             local,
             address,
             store,
             download_dir: Mutex::new(download_dir),
+            transfer_cache: config.data_dir.join("folder-snapshots"),
             pairings: Pairings::default(),
             receipts: Receipts::default(),
             live: Mutex::new(HashMap::new()),
@@ -111,6 +139,13 @@ impl Engine {
             discovery: Mutex::new(discovery),
             discovery_error,
             server_task: Mutex::new(None),
+            network: Mutex::new(network),
+            relay: Mutex::new(None),
+            network_updates: tokio::sync::Mutex::new(()),
+            relay_events,
+            relay_task: Mutex::new(None),
+            transfers: Arc::new(crate::transfers::runtime::Runtime::default()),
+            route_revision: tokio::sync::watch::channel(0).0,
         });
         let task = tokio::spawn(server::listen(
             Arc::clone(&engine),
@@ -118,6 +153,12 @@ impl Engine {
             file_trans_identity::TlsAcceptor::from(tls),
         ));
         *engine.server_task.lock().unwrap() = Some(task);
+        *engine.relay_task.lock().unwrap() = Some(tokio::spawn(network::receive(
+            Arc::clone(&engine),
+            receiver,
+        )));
+        engine.configure_relay()?;
+        engine.restore_transfers().await?;
         Ok(engine)
     }
 
@@ -148,7 +189,8 @@ impl Engine {
         activities.sort_by_key(|activity| std::cmp::Reverse(activity.timestamp));
         let mut completed = 0;
         activities.retain(|activity| {
-            if ["completed", "failed", "rejected"].contains(&activity.status.as_str()) {
+            if ["completed", "failed", "rejected", "cancelled"].contains(&activity.status.as_str())
+            {
                 completed += 1;
                 completed <= 200
             } else {
@@ -176,6 +218,8 @@ impl Engine {
             peers: self.store.peers()?,
             pairings: self.pairings.snapshot(),
             activities,
+            network: self.network_settings(),
+            relay: self.relay_status(),
         })
     }
 
@@ -192,7 +236,10 @@ impl Engine {
         self.pairings.decide(id, accepted)
     }
     pub fn decide_file(&self, id: &str, accepted: bool) -> Result<()> {
-        self.receipts.decide(id, accepted)
+        self.decide_managed_file(None, id, accepted)
+    }
+    pub fn decide_file_from(&self, peer_id: &str, id: &str, accepted: bool) -> Result<()> {
+        self.decide_managed_file(Some(peer_id), id, accepted)
     }
     pub fn forget_peer(&self, id: &str) -> Result<()> {
         self.store.forget_peer(id)
@@ -209,8 +256,17 @@ impl Engine {
 
     pub async fn shutdown(&self) {
         self.cancel.cancel();
+        if let Some(client) = self.relay.lock().unwrap().take() {
+            client.stop();
+        }
         self.discovery.lock().unwrap().take();
         let task = self.server_task.lock().unwrap().take();
+        if let Some(task) = task {
+            let _ = task.await;
+        }
+        self.transfers.tracker.close();
+        self.transfers.tracker.wait().await;
+        let task = self.relay_task.lock().unwrap().take();
         if let Some(task) = task {
             let _ = task.await;
         }

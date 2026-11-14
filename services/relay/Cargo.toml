@@ -1,0 +1,18 @@
+[package]
+name = "file-trans-relay-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+uuid.workspace = true
+bytes.workspace = true
+futures-util.workspace = true
+file-trans-relay.workspace = true
+file-trans-identity.workspace = true
+axum = { version = "0.8", features = ["ws"] }

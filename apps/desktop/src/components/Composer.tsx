@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Plus, Send } from 'lucide-react';
+import { Plus, Send, FolderOpen } from 'lucide-react';
 
 interface Props {
   onSend: (text: string) => Promise<unknown>;
   onChooseFile: () => void;
+  onChooseFolder: () => void;
 }
 
-export function Composer({ onSend, onChooseFile }: Props) {
+export function Composer({ onSend, onChooseFile, onChooseFolder }: Props) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   async function send() {
@@ -42,7 +43,11 @@ export function Composer({ onSend, onChooseFile }: Props) {
           <Plus size={16} />
           选择文件
         </button>
-        <span>也可以将文件拖到这里</span>
+        <button className="button secondary" onClick={onChooseFolder}>
+          <FolderOpen size={16} />
+          选择文件夹
+        </button>
+        <span>可从系统直接拖入文件或文件夹</span>
         <button
           className="button primary send-button"
           disabled={busy || !text.trim()}

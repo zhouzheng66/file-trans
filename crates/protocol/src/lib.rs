@@ -6,6 +6,48 @@ pub const VERSION: u16 = 1;
 pub const MAX_TEXT: usize = 64 * 1024;
 pub const MAX_CONTROL: usize = 512 * 1024;
 pub const CHUNK_SIZE: usize = 256 * 1024;
+pub const FILE_VERSION: u16 = 2;
+pub const FOLDER_VERSION: u16 = 3;
+pub const CHECKPOINT_SIZE: u64 = 4 * 1024 * 1024;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Direction {
+    Incoming,
+    Outgoing,
+}
+impl Direction {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Incoming => "incoming",
+            Self::Outgoing => "outgoing",
+        }
+    }
+    pub fn opposite(self) -> Self {
+        match self {
+            Self::Incoming => Self::Outgoing,
+            Self::Outgoing => Self::Incoming,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FileIdentity {
+    pub name: String,
+    pub size: u64,
+    pub sha256: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum ResumeState {
+    Ready { offset: u64, prefix_sha256: String },
+    Completed,
+    Paused,
+    Busy,
+    Rejected,
+    Failed { message: String },
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,6 +60,44 @@ pub struct Device {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Message {
+    FolderOffer {
+        version: u16,
+        id: String,
+        folder: FileIdentity,
+    },
+    TransferOffer {
+        version: u16,
+        id: String,
+        file: FileIdentity,
+    },
+    TransferReply {
+        id: String,
+        result: ResumeState,
+    },
+    TransferChunk {
+        offset: u64,
+        length: u32,
+        sha256: String,
+    },
+    TransferCheckpoint {
+        offset: u64,
+        prefix_sha256: String,
+    },
+    TransferAck {
+        offset: u64,
+    },
+    TransferFinish {
+        id: String,
+    },
+    TransferKeepAlive,
+    TransferSignal {
+        version: u16,
+        id: String,
+        direction: Direction,
+        paused: bool,
+        cancelled: bool,
+        sequence: u64,
+    },
     PairRequest {
         version: u16,
         device: Device,

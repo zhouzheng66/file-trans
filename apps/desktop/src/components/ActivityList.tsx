@@ -1,7 +1,8 @@
-import { CheckCheck, Copy, File, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { CheckCheck, Copy, File, Folder, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import type { Activity, Peer } from '../types';
 import { useEffect, useRef } from 'react';
+import { TransferActions } from './TransferActions';
 
 export function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -23,14 +24,24 @@ const statuses: Record<string, string> = {
   completed: '已完成',
   failed: '未完成',
   rejected: '已拒绝',
+  preparing: '正在校验源文件',
+  paused: '已暂停',
+  paused_by_peer: '对方已暂停',
+  waiting_retry: '等待网络恢复，自动续传',
+  waiting_connection: '断点已保存，等待续传',
+  cancelled: '已取消',
 };
 interface Props {
   activities: Activity[];
   peers: Peer[];
-  onDecide: (id: string, accepted: boolean) => void;
+  onDecide: (activity: Activity, accepted: boolean) => void;
   onError: (message: string) => void;
+  onTransferAction: (
+    activity: Activity,
+    action: 'pause_transfer' | 'resume_transfer' | 'cancel_transfer',
+  ) => void;
 }
-export function ActivityList({ activities, peers, onDecide, onError }: Props) {
+export function ActivityList({ activities, peers, onDecide, onError, onTransferAction }: Props) {
   const end = useRef<HTMLDivElement>(null);
   const latest = activities.at(-1)?.id;
   useEffect(() => {
@@ -41,6 +52,8 @@ export function ActivityList({ activities, peers, onDecide, onError }: Props) {
       {activities.map((activity) => {
         const incoming = activity.direction === 'incoming';
         const peer = peers.find((peer) => peer.id === activity.peerId);
+        const route =
+          activity.route === 'lan' ? '局域网直连' : activity.route === 'relay' ? '互联网中继' : '';
         const progress = activity.size
           ? Math.min(100, (activity.transferred / activity.size) * 100)
           : activity.status === 'completed'
@@ -80,14 +93,24 @@ export function ActivityList({ activities, peers, onDecide, onError }: Props) {
             ) : (
               <div className="file-card">
                 <div className="file-icon">
-                  <File size={23} />
+                  {activity.kind === 'folder' ? <Folder size={23} /> : <File size={23} />}
                 </div>
                 <div className="file-details">
-                  <strong>{activity.content}</strong>
+                  <strong>
+                    {activity.content}
+                    {activity.kind === 'folder' && ' · 文件夹'}
+                  </strong>
                   <span>
-                    {formatSize(activity.size)} · {statuses[activity.status] ?? activity.status}
+                    {activity.kind === 'folder' && activity.status === 'preparing' && !activity.size
+                      ? '大小统计中'
+                      : formatSize(activity.size)}{' '}
+                    ·{' '}
+                    {activity.kind === 'folder' && activity.status === 'preparing'
+                      ? '正在准备目录快照'
+                      : (statuses[activity.status] ?? activity.status)}
+                    {route && ` · ${route}`}
                   </span>
-                  {!['completed', 'failed', 'rejected', 'awaiting_accept'].includes(
+                  {!['completed', 'failed', 'rejected', 'cancelled', 'awaiting_accept'].includes(
                     activity.status,
                   ) && (
                     <>
@@ -96,6 +119,11 @@ export function ActivityList({ activities, peers, onDecide, onError }: Props) {
                         {formatSize(activity.transferred)} / {formatSize(activity.size)}
                       </span>
                     </>
+                  )}
+                  {activity.resumedFrom > 0 && (
+                    <small className="saved-path">
+                      已从 {formatSize(activity.resumedFrom)} 断点继续
+                    </small>
                   )}
                   {incoming && activity.status === 'completed' && (
                     <small className="saved-path" title={activity.path ?? ''}>
@@ -106,28 +134,29 @@ export function ActivityList({ activities, peers, onDecide, onError }: Props) {
                 {activity.status === 'completed' && <CheckCheck className="success" size={19} />}
               </div>
             )}
-            {incoming && activity.kind === 'file' && activity.status === 'awaiting_accept' && (
+            {incoming && activity.kind !== 'text' && activity.status === 'awaiting_accept' && (
               <div className="receipt-actions">
                 <button
                   className="button secondary small"
-                  onClick={() => onDecide(activity.id, false)}
+                  onClick={() => onDecide(activity, false)}
                 >
                   拒绝
                 </button>
-                <button
-                  className="button primary small"
-                  onClick={() => onDecide(activity.id, true)}
-                >
-                  接收文件
+                <button className="button primary small" onClick={() => onDecide(activity, true)}>
+                  {activity.kind === 'folder' ? '接收文件夹' : '接收文件'}
                 </button>
               </div>
             )}
             {activity.kind === 'text' && (
               <small className={`delivery ${activity.status === 'failed' ? 'failure' : ''}`}>
                 {statuses[activity.status] ?? activity.status}
+                {route && ` · ${route}`}
               </small>
             )}
             {activity.error && <p className="inline-error">{activity.error}</p>}
+            {activity.kind !== 'text' && (
+              <TransferActions activity={activity} onAction={onTransferAction} />
+            )}
           </article>
         );
       })}

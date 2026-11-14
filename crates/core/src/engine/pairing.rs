@@ -1,16 +1,51 @@
 use super::{validate_name, Engine, IO_TIMEOUT};
-use crate::model::{Pairing, Peer};
+use crate::model::{NetworkMode, Pairing, Peer};
 use anyhow::{ensure, Context, Result};
 use file_trans_identity::{peer_id, secure_code, TlsStream};
 use file_trans_protocol::{read_message, write_message, Device, Message, VERSION};
+use file_trans_relay::protocol::Target;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::time::timeout;
 use uuid::Uuid;
 
 impl Engine {
     pub async fn request_pair(self: &Arc<Self>, address: SocketAddr) -> Result<String> {
+        ensure!(
+            self.network_settings().mode != NetworkMode::Internet,
+            "仅互联网模式请使用跨网配对码"
+        );
         let permit = self.outbound_permit().await?;
-        let mut stream = self.open_address(address, None).await?;
+        let stream = self.open_address(address, None).await?;
+        self.begin_pair(stream, Some(address), permit).await
+    }
+
+    pub async fn request_pair_code(self: &Arc<Self>, code: String) -> Result<String> {
+        let code: String = code
+            .chars()
+            .filter(|character| !character.is_whitespace() && *character != '-')
+            .collect::<String>()
+            .to_ascii_uppercase();
+        ensure!(
+            code.len() == 12 && code.bytes().all(|byte| byte.is_ascii_hexdigit()),
+            "请输入有效的 12 位跨网配对码"
+        );
+        let permit = self.outbound_permit().await?;
+        let remote = self.relay_client()?.open(Target::Invite(code)).await?;
+        let stream = timeout(
+            IO_TIMEOUT,
+            file_trans_identity::connect(remote.stream, &self.identity, Some(&remote.peer_id)),
+        )
+        .await
+        .context("跨网配对握手超时")??;
+        self.begin_pair(stream, None, permit).await
+    }
+
+    async fn begin_pair(
+        self: &Arc<Self>,
+        mut stream: TlsStream,
+        address: Option<SocketAddr>,
+        permit: tokio::sync::OwnedSemaphorePermit,
+    ) -> Result<String> {
         let remote_id = peer_id(&stream)?;
         ensure!(remote_id != self.local.id, "不能与本机配对");
         let code = secure_code(&stream)?;
@@ -39,7 +74,9 @@ impl Engine {
         let peer = Peer {
             id: remote_id,
             name: device.name,
-            address: SocketAddr::new(address.ip(), device.port).to_string(),
+            address: address
+                .map(|address| SocketAddr::new(address.ip(), device.port).to_string())
+                .unwrap_or_default(),
         };
         let decision = self.pairings.register(Pairing {
             id: request_id.clone(),
@@ -84,7 +121,7 @@ impl Engine {
     pub(crate) async fn receive_pair(
         &self,
         stream: &mut TlsStream,
-        address: SocketAddr,
+        address: Option<SocketAddr>,
         device: Device,
     ) -> Result<()> {
         validate_name(&device.name)?;
@@ -97,7 +134,9 @@ impl Engine {
         let peer = Peer {
             id: remote_id,
             name: device.name,
-            address: SocketAddr::new(address.ip(), device.port).to_string(),
+            address: address
+                .map(|address| SocketAddr::new(address.ip(), device.port).to_string())
+                .unwrap_or_default(),
         };
         let decision = self.pairings.register(Pairing {
             id: id.clone(),

@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { ask, open } from '@tauri-apps/plugin-dialog';
-import { ArrowDownUp, Cable, FolderOpen, Link2, ShieldCheck, X } from 'lucide-react';
+import { ArrowDownUp, FolderOpen, Link2, ShieldCheck, X } from 'lucide-react';
 import { useEngine } from './hooks/useEngine';
 import { useDropFiles } from './hooks/useDropFiles';
+import { sendPaths } from './hooks/sendPaths';
 import { PairingDialog } from './components/PairingDialog';
 import { ActivityList } from './components/ActivityList';
 import { DeviceSidebar } from './components/DeviceSidebar';
 import { Composer } from './components/Composer';
 import { Welcome } from './components/Welcome';
+import { NetworkPanel } from './components/NetworkPanel';
 import './styles.css';
 
 function ignore(promise: Promise<unknown>) {
@@ -56,10 +58,17 @@ export default function App() {
       setConnecting(false);
     }
   }
-  async function chooseFile() {
+  async function choosePaths(directory: boolean) {
+    if (!peer) return;
+    const peerId = peer.id;
     try {
-      const path = await open({ multiple: false, directory: false, title: '选择要发送的文件' });
-      if (path && peer) await run('send_file', { peerId: peer.id, path });
+      const paths = await open({
+        multiple: !directory,
+        directory,
+        title: directory ? '选择要发送的文件夹' : '选择要发送的文件',
+      });
+      if (paths)
+        await sendPaths(typeof paths === 'string' ? [paths] : paths, peerId, run, setError);
     } catch (error) {
       setError(String(error));
     }
@@ -105,11 +114,9 @@ export default function App() {
             <div className="eyebrow">让文件，在你的电脑间流动</div>
             <h1>{peer?.name ?? '你的电脑，轻松相连'}</h1>
           </div>
-          <span className="network-badge">
-            <Cable size={14} />
-            仅局域网
-          </span>
+          <span className="network-badge">设备间加密传输</span>
         </header>
+        <NetworkPanel snapshot={snapshot} run={run} onError={setError} />
         {error && (
           <div className="error-banner" role="alert">
             <span>{error}</span>
@@ -142,7 +149,7 @@ export default function App() {
         {pendingElsewhere.length > 0 && (
           <div className="notice-banner">
             <button className="text-button" onClick={() => setSelected(pendingElsewhere[0].peerId)}>
-              另有 {pendingElsewhere.length} 个文件等待接收，点击查看
+              另有 {pendingElsewhere.length} 个传输任务等待接收，点击查看
             </button>
           </div>
         )}
@@ -165,14 +172,29 @@ export default function App() {
                 <ActivityList
                   activities={activities}
                   peers={snapshot!.peers}
-                  onDecide={(id, accepted) => ignore(run('decide_file', { id, accepted }))}
+                  onDecide={(activity, accepted) =>
+                    ignore(
+                      run('decide_file', { id: activity.id, peerId: activity.peerId, accepted }),
+                    )
+                  }
                   onError={setError}
+                  onTransferAction={(activity, command) =>
+                    ignore(
+                      run(command, {
+                        key: {
+                          id: activity.id,
+                          peerId: activity.peerId,
+                          direction: activity.direction,
+                        },
+                      }),
+                    )
+                  }
                 />
               ) : (
                 <div className="conversation-empty">
                   <Link2 size={34} />
                   <h2>已经准备好，发点什么吧</h2>
-                  <p>发送一段文字，或拖入任意格式的文件。</p>
+                  <p>发送文字，或从系统拖入文件和文件夹。</p>
                 </div>
               )}
             </>
@@ -184,7 +206,8 @@ export default function App() {
           <Composer
             key={peer.id}
             onSend={(text) => run('send_text', { peerId: peer.id, text })}
-            onChooseFile={() => ignore(chooseFile())}
+            onChooseFile={() => ignore(choosePaths(false))}
+            onChooseFolder={() => ignore(choosePaths(true))}
           />
         )}
         <footer className="main-footer">
@@ -202,7 +225,7 @@ export default function App() {
         {dragging && (
           <div className="drop-overlay">
             <ArrowDownUp size={45} />
-            <h2>松开，发送到这台电脑</h2>
+            <h2>松开，发送文件或文件夹</h2>
             <p>{peer?.name ?? '请先配对并选择接收设备'}</p>
           </div>
         )}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { isTauri } from '@tauri-apps/api/core';
+import { sendPaths } from './sendPaths';
 
 type Run = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
@@ -22,9 +23,7 @@ export function useDropFiles(
           onError('请先选择一台已配对的电脑。');
           return;
         }
-        for (const path of event.payload.paths.slice(0, 4))
-          void run('send_file', { peerId: selected, path }).catch(() => {});
-        if (event.payload.paths.length > 4) onError('一次最多同时发送 4 个文件，请分批拖入。');
+        void sendPaths(event.payload.paths, selected, run, onError);
       })
       .then((stop) => {
         if (disposed) stop();

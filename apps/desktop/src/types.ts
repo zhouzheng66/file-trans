@@ -33,6 +33,21 @@ export interface Activity {
   path: string | null;
   error: string | null;
   timestamp: number;
+  route: 'lan' | 'relay' | null;
+  resumable: boolean;
+  resumedFrom: number;
+  reconnectCount: number;
+}
+export type NetworkMode = 'auto' | 'lan' | 'internet';
+export interface NetworkSettings {
+  mode: NetworkMode;
+  relayUrl: string;
+}
+export interface RelayStatus {
+  state: string;
+  error: string | null;
+  inviteCode: string | null;
+  inviteExpiresAt: number | null;
 }
 export interface Snapshot {
   local: Device;
@@ -44,4 +59,6 @@ export interface Snapshot {
   peers: Peer[];
   pairings: Pairing[];
   activities: Activity[];
+  network: NetworkSettings;
+  relay: RelayStatus;
 }

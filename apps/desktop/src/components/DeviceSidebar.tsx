@@ -45,7 +45,7 @@ export function DeviceSidebar({
           <strong>轻传</strong>
           <span>FILE TRANS</span>
         </div>
-        <span className="version">LOCAL</span>
+        <span className="version">LINK</span>
       </div>
       <div className="local-device">
         <div className="local-device-icon">
@@ -96,7 +96,7 @@ export function DeviceSidebar({
           </p>
         )}
       </div>
-      {unpaired.length > 0 && (
+      {unpaired.length > 0 && snapshot?.network.mode !== 'internet' && (
         <>
           <div className="section-title">
             <span>附近的设备</span>
@@ -119,7 +119,12 @@ export function DeviceSidebar({
           ))}
         </>
       )}
-      {manual && (
+      {manual && snapshot?.network.mode === 'internet' && (
+        <p className="sidebar-note">
+          当前为仅互联网模式，请在顶部“互联网设置与跨网配对”输入对方的配对码。
+        </p>
+      )}
+      {manual && snapshot?.network.mode !== 'internet' && (
         <form
           className="manual-form"
           onSubmit={(event) => {

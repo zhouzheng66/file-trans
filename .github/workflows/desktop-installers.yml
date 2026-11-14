@@ -1,0 +1,116 @@
+name: Desktop Installers
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify release source
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Install credential library headers
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config dbus-x11 gnome-keyring
+      - run: npm ci
+      - run: node scripts/release-version.mjs
+      - run: npm run build
+      - run: npm run format:check
+      - run: npm run test:ui
+      - run: npm run test:core -- --locked
+      - name: Verify Linux identity in a real Secret Service session
+        run: dbus-run-session -- bash scripts/check-linux-identity.sh
+      - run: node scripts/rust.mjs fmt --all --check
+      - run: node scripts/rust.mjs clippy -p file-trans-core -p file-trans-relay -p file-trans-relay-server --all-targets --locked -- -D warnings
+
+  build:
+    name: Package ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: nsis
+          - platform: macos-arm64
+            runner: macos-latest
+            target: aarch64-apple-darwin
+            bundles: dmg
+          - platform: macos-x64
+            runner: macos-latest
+            target: x86_64-apple-darwin
+            bundles: dmg
+          - platform: linux-x64
+            runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: deb,appimage
+    runs-on: ${{ matrix.runner }}
+    env:
+      APPIMAGE_EXTRACT_AND_RUN: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - name: Install Linux build libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev libdbus-1-dev patchelf
+      - run: npm ci
+      - run: node scripts/release-version.mjs
+      - run: npm run test:ui
+      - run: npm run test:core -- --locked
+      - name: Build installers
+        run: npm run desktop:build -- --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+      - name: Collect installers and checksums
+        run: node scripts/collect-installers.mjs ${{ matrix.platform }} ${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: file-trans-${{ matrix.platform }}-installers
+          path: release-assets/${{ matrix.platform }}/
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Publish verified installers
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: file-trans-*-installers
+          path: release-assets
+          merge-multiple: true
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          node scripts/release-version.mjs
+          gh release create "$GITHUB_REF_NAME" release-assets/* --verify-tag --title "File Trans $GITHUB_REF_NAME" --notes-file "docs/releases/$GITHUB_REF_NAME.md"

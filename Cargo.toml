@@ -1,10 +1,10 @@
 [workspace]
-members = ["crates/protocol", "crates/identity", "crates/discovery", "crates/core", "apps/desktop/src-tauri"]
-default-members = ["crates/protocol", "crates/identity", "crates/discovery", "crates/core"]
+members = ["crates/protocol", "crates/identity", "crates/discovery", "crates/relay", "crates/core", "services/relay", "apps/desktop/src-tauri"]
+default-members = ["crates/protocol", "crates/identity", "crates/discovery", "crates/relay", "crates/core", "services/relay"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 
@@ -22,3 +22,7 @@ file-trans-protocol = { path = "crates/protocol" }
 file-trans-identity = { path = "crates/identity" }
 file-trans-discovery = { path = "crates/discovery" }
 file-trans-core = { path = "crates/core" }
+file-trans-relay = { path = "crates/relay" }
+file-trans-relay-server = { path = "services/relay" }
+bytes = "1"
+futures-util = { version = "0.3", features = ["sink"] }

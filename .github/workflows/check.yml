@@ -18,7 +18,18 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run format:check
+      - run: npm run test:ui
       - run: npm run test:core
       - run: npm run check:rust
       - run: npm run lint:rust
       - run: node scripts/rust.mjs fmt --all -- --check
+  relay-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
+      - run: cargo test --locked -p file-trans-core -p file-trans-relay -p file-trans-relay-server
+      - run: cargo clippy --locked -p file-trans-core -p file-trans-relay -p file-trans-relay-server --all-targets -- -D warnings

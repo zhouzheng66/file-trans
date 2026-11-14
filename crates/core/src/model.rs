@@ -2,6 +2,38 @@ use file_trans_discovery::DiscoveredDevice;
 use file_trans_protocol::Device;
 use serde::{Deserialize, Serialize};
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NetworkMode {
+    #[default]
+    Auto,
+    Lan,
+    Internet,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Route {
+    Lan,
+    Relay,
+}
+
+impl NetworkMode {
+    pub fn allows(self, route: Route) -> bool {
+        !matches!(
+            (self, route),
+            (Self::Lan, Route::Relay) | (Self::Internet, Route::Lan)
+        )
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkSettings {
+    pub mode: NetworkMode,
+    pub relay_url: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Peer {
@@ -24,6 +56,14 @@ pub struct Activity {
     pub path: Option<String>,
     pub error: Option<String>,
     pub timestamp: u64,
+    #[serde(default)]
+    pub route: Option<Route>,
+    #[serde(default)]
+    pub resumable: bool,
+    #[serde(default)]
+    pub resumed_from: u64,
+    #[serde(default)]
+    pub reconnect_count: u32,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -49,6 +89,8 @@ pub struct Snapshot {
     pub peers: Vec<Peer>,
     pub pairings: Vec<Pairing>,
     pub activities: Vec<Activity>,
+    pub network: NetworkSettings,
+    pub relay: file_trans_relay::RelayStatus,
 }
 
 pub fn now() -> u64 {
@@ -79,6 +121,10 @@ impl Activity {
             path: None,
             error: None,
             timestamp: now(),
+            route: None,
+            resumable: false,
+            resumed_from: 0,
+            reconnect_count: 0,
         }
     }
 }

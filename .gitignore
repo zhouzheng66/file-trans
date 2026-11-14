@@ -209,6 +209,7 @@ tempCodeRunnerFile.py
 node_modules/
 .tooling/
 .local-data/
+release-assets/
 *.db-wal
 *.db-shm
 .DS_Store

@@ -1,0 +1,29 @@
+services:
+  relay:
+    build:
+      context: ../..
+      dockerfile: services/relay/Dockerfile
+    restart: unless-stopped
+    environment:
+      RELAY_LISTEN: 0.0.0.0:8787
+      # 反向代理下服务看到代理 IP，按实际设备数量调整，不能盲信客户端提交的 IP 头。
+      RELAY_MAX_CONNECTIONS_PER_IP: 128
+      RELAY_MAX_DEVICES: 256
+      RELAY_MAX_SESSIONS: 64
+      RELAY_MAX_SESSION_BYTES: 17179869184
+      RELAY_MAX_SESSION_SECONDS: 7200
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      RELAY_DOMAIN: ${RELAY_DOMAIN:?请设置公网域名 RELAY_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+volumes:
+  caddy_data:
+  caddy_config:

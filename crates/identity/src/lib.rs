@@ -1,11 +1,13 @@
 mod tls;
 
-use anyhow::{Context, Result};
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
+use anyhow::Context;
+use anyhow::Result;
 use rcgen::generate_simple_self_signed;
 use sha2::{Digest, Sha256};
 use std::{path::Path, sync::Arc};
 
-pub use tls::{connect, peer_id, secure_code, server_config, TlsStream};
+pub use tls::{connect, peer_id, secure_code, server_config, BoxedStream, TlsStream};
 pub use tokio_rustls::TlsAcceptor;
 
 #[derive(Clone)]
@@ -32,7 +34,7 @@ impl Identity {
         }
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     pub fn load_or_create(directory: &Path) -> Result<Self> {
         std::fs::create_dir_all(directory)?;
         let path = directory.join("device-cert.der");
@@ -58,9 +60,9 @@ impl Identity {
         Ok(identity)
     }
 
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     pub fn load_or_create(_directory: &Path) -> Result<Self> {
-        anyhow::bail!("当前桌面版本仅支持 Windows 和 macOS 的系统凭据库")
+        anyhow::bail!("当前桌面版本仅支持 Windows、macOS 和 Linux 的系统凭据库")
     }
 }
 
