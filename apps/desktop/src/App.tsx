@@ -70,12 +70,15 @@ export default function App() {
   async function forgetPeer(id: string, name: string) {
     try {
       if (
-        await ask(`移除对 ${name} 的信任？后续收发需要重新配对。`, {
-          title: '移除设备信任',
-          kind: 'warning',
-          okLabel: '移除',
-          cancelLabel: '取消',
-        })
+        await ask(
+          `删除设备“${name}”？删除后停止信任该设备，再次收发需要重新配对，已有文件和历史记录会保留。`,
+          {
+            title: '删除设备',
+            kind: 'warning',
+            okLabel: '移除',
+            cancelLabel: '取消',
+          },
+        )
       )
         await run('forget_peer', { id });
     } catch (error) {
@@ -92,6 +95,7 @@ export default function App() {
         connecting={connecting}
         onSelect={setSelected}
         onToggleManual={() => setManual(!manual)}
+        onDelete={(id, name) => ignore(forgetPeer(id, name))}
         onPair={(addresses) => ignore(pair(addresses))}
       />
       <main className={`main-panel ${dragging ? 'dragging' : ''}`}>

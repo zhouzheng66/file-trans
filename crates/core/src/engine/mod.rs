@@ -1,3 +1,4 @@
+mod lan;
 mod network;
 mod pairing;
 mod server;
@@ -69,9 +70,10 @@ pub struct Engine {
     pub(crate) decision_timeout: Duration,
     pub(crate) auto_accept_files: bool,
     pub(crate) outbound: Arc<Semaphore>,
-    discovery: Mutex<Option<Discovery>>,
+    discovery: Mutex<Option<Arc<Discovery>>>,
     discovery_error: Option<String>,
     server_task: Mutex<Option<JoinHandle<()>>>,
+    lan_task: Mutex<Option<JoinHandle<()>>>,
     network: Mutex<NetworkSettings>,
     relay: Mutex<Option<RelayClient>>,
     network_updates: tokio::sync::Mutex<()>,
@@ -116,7 +118,7 @@ impl Engine {
         };
         let (discovery, discovery_error) = if config.enable_discovery {
             match Discovery::start(&local.id, &local.name, local.port) {
-                Ok(discovery) => (Some(discovery), None),
+                Ok(discovery) => (Some(Arc::new(discovery)), None),
                 Err(error) => (
                     None,
                     Some(format!("自动发现不可用，可使用手动地址连接：{error:#}")),
@@ -144,6 +146,7 @@ impl Engine {
             discovery: Mutex::new(discovery),
             discovery_error,
             server_task: Mutex::new(None),
+            lan_task: Mutex::new(None),
             network: Mutex::new(network),
             relay: Mutex::new(None),
             network_updates: tokio::sync::Mutex::new(()),
@@ -162,6 +165,13 @@ impl Engine {
             Arc::clone(&engine),
             receiver,
         )));
+        let discovery = engine.discovery.lock().unwrap().clone();
+        if let Some(discovery) = discovery {
+            *engine.lan_task.lock().unwrap() = Some(tokio::spawn(lan::refresh_paired(
+                Arc::clone(&engine),
+                discovery,
+            )));
+        }
         engine.configure_relay()?;
         engine.restore_transfers().await?;
         Ok(engine)
@@ -233,7 +243,7 @@ impl Engine {
             .lock()
             .unwrap()
             .as_ref()
-            .map(Discovery::devices)
+            .map(|discovery| discovery.devices())
             .unwrap_or_default()
     }
 
@@ -268,6 +278,10 @@ impl Engine {
         self.cancel.cancel();
         if let Some(client) = self.relay.lock().unwrap().take() {
             client.stop();
+        }
+        let task = self.lan_task.lock().unwrap().take();
+        if let Some(task) = task {
+            let _ = task.await;
         }
         self.discovery.lock().unwrap().take();
         let task = self.server_task.lock().unwrap().take();

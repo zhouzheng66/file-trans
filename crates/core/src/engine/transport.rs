@@ -3,7 +3,6 @@ use crate::model::{NetworkMode, Route};
 use anyhow::{Context, Result};
 use file_trans_identity::{connect, TlsStream};
 use file_trans_relay::protocol::Target;
-use futures_util::{stream, StreamExt};
 use std::{net::SocketAddr, time::Duration};
 use tokio::{net::TcpStream, time::timeout};
 
@@ -19,7 +18,9 @@ impl Engine {
         expected: Option<&str>,
     ) -> Result<TlsStream> {
         timeout(Duration::from_secs(5), async {
-            let tcp = TcpStream::connect(address).await?;
+            let tcp = TcpStream::connect(address)
+                .await
+                .with_context(|| format!("连接 {address} 失败"))?;
             tcp.set_nodelay(true)?;
             connect(tcp, &self.identity, expected).await
         })
@@ -64,36 +65,6 @@ impl Engine {
             Some(error) => format!("局域网不可达（{error:#}）；互联网中继连接失败"),
             None => "互联网中继连接失败".into(),
         })
-    }
-
-    pub(crate) async fn open_lan(&self, id: &str, remembered_address: String) -> Result<TlsStream> {
-        let mut addresses: Vec<String> = self
-            .discovered()
-            .into_iter()
-            .filter(|device| device.id == id)
-            .flat_map(|device| device.addresses)
-            .collect();
-        addresses.push(remembered_address);
-        addresses.sort();
-        addresses.dedup();
-        timeout(Duration::from_secs(3), async {
-            let attempts = addresses
-                .into_iter()
-                .filter_map(|address| address.parse::<SocketAddr>().ok())
-                .take(8)
-                .map(|address| self.open_address(address, Some(id)));
-            let mut attempts = stream::iter(attempts).buffer_unordered(4);
-            let mut last_error = anyhow::anyhow!("没有可用的局域网地址");
-            while let Some(result) = attempts.next().await {
-                match result {
-                    Ok(stream) => return Ok(stream),
-                    Err(error) => last_error = error,
-                }
-            }
-            Err(last_error)
-        })
-        .await
-        .context("局域网探测超时")?
     }
 
     pub(crate) async fn outbound_permit(&self) -> Result<tokio::sync::OwnedSemaphorePermit> {

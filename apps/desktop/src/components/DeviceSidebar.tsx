@@ -1,16 +1,8 @@
 import { useState } from 'react';
-import {
-  ArrowDownUp,
-  ArrowRight,
-  ChevronRight,
-  Laptop,
-  Monitor,
-  Plus,
-  ShieldCheck,
-  Wifi,
-} from 'lucide-react';
+import { ArrowDownUp, ArrowRight, Laptop, Monitor, Plus, ShieldCheck, Wifi } from 'lucide-react';
 import type { Snapshot } from '../types';
 import { version } from '../../package.json';
+import { DeviceMenu } from './DeviceMenu';
 
 interface Props {
   snapshot: Snapshot | null;
@@ -19,6 +11,7 @@ interface Props {
   connecting: boolean;
   onSelect: (id: string) => void;
   onToggleManual: () => void;
+  onDelete: (id: string, name: string) => void;
   onPair: (addresses: string | string[]) => void;
 }
 
@@ -29,6 +22,7 @@ export function DeviceSidebar({
   connecting,
   onSelect,
   onToggleManual,
+  onDelete,
   onPair,
 }: Props) {
   const [address, setAddress] = useState('');
@@ -78,21 +72,22 @@ export function DeviceSidebar({
         {snapshot?.peers.map((device) => {
           const discovered = snapshot.discovered.some((found) => found.id === device.id);
           return (
-            <button
-              className={`peer-button ${selected === device.id ? 'selected' : ''}`}
-              key={device.id}
-              onClick={() => onSelect(device.id)}
-            >
-              <Monitor size={22} />
-              <span>
-                <strong title={device.name}>{device.name}</strong>
-                <small>
-                  <i className={discovered ? 'dot online' : 'dot'} />
-                  {discovered ? '局域网已发现' : '已配对 · 可尝试连接'}
-                </small>
-              </span>
-              <ChevronRight size={15} />
-            </button>
+            <div className="peer-row" key={device.id}>
+              <button
+                className={`peer-button ${selected === device.id ? 'selected' : ''}`}
+                onClick={() => onSelect(device.id)}
+              >
+                <Monitor size={22} />
+                <span>
+                  <strong title={device.name}>{device.name}</strong>
+                  <small>
+                    <i className={discovered ? 'dot online' : 'dot'} />
+                    {discovered ? '局域网已发现' : '已配对 · 可尝试连接'}
+                  </small>
+                </span>
+              </button>
+              <DeviceMenu name={device.name} onDelete={() => onDelete(device.id, device.name)} />
+            </div>
           );
         })}
         {snapshot?.peers.length === 0 && (

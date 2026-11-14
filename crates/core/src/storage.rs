@@ -32,6 +32,15 @@ impl Store {
         Ok(())
     }
 
+    /// 仅在 TLS 已验证设备身份后调用；UPDATE 不会恢复已撤销的信任。
+    pub fn update_peer_address(&self, id: &str, address: &str) -> Result<()> {
+        self.0.lock().unwrap().execute(
+            "UPDATE peers SET address=?1 WHERE id=?2",
+            params![address, id],
+        )?;
+        Ok(())
+    }
+
     pub fn peers(&self) -> Result<Vec<Peer>> {
         let db = self.0.lock().unwrap();
         let mut query = db.prepare("SELECT id, name, address FROM peers ORDER BY name")?;
