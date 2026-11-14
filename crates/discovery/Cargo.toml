@@ -1,0 +1,12 @@
+[package]
+name = "file-trans-discovery"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+mdns-sd = "0.17"
+tokio.workspace = true
+tokio-util.workspace = true

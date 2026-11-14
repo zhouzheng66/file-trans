@@ -1,0 +1,17 @@
+[package]
+name = "file-trans-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+default-run = "file-trans-desktop"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-clipboard-manager = "2"
+file-trans-core.workspace = true
+file-trans-identity.workspace = true
+hostname = "0.4"

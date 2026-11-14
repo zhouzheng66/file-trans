@@ -1,0 +1,136 @@
+.error-banner,
+.notice-banner {
+  margin: 12px 30px 0;
+  padding: 10px 13px;
+  border-radius: 7px;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.error-banner {
+  color: #a66b53;
+  background: #fcf1e9;
+  border: 1px solid #f4e1d4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.notice-banner {
+  color: #8c805b;
+  background: #f7f4e9;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: #24383050;
+  backdrop-filter: blur(5px);
+  display: grid;
+  place-items: center;
+  z-index: 10;
+}
+.pairing-dialog {
+  width: 410px;
+  padding: 31px;
+  background: #fff;
+  border-radius: 19px;
+  box-shadow: 0 30px 80px #16271c30;
+  text-align: center;
+}
+.dialog-icon {
+  color: #4f8b70;
+  background: #edf5ef;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 16px;
+}
+.pairing-dialog h2 {
+  font-size: 20px;
+  font-weight: 550;
+}
+.pairing-dialog p {
+  font-size: 12px;
+  color: #788880;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.pairing-dialog p.muted {
+  font-size: 11px;
+  color: #9aa69f;
+}
+.security-code {
+  color: #32664e;
+  font-size: 33px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 5px;
+  background: #f2f7f3;
+  padding: 17px 10px;
+  border: 1px solid #e5eee7;
+  border-radius: 10px;
+  margin: 21px 0 11px;
+}
+.pairing-dialog .fingerprint {
+  color: #a3ada6;
+  font-size: 9px;
+  font-family: monospace;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 24px;
+}
+.waiting {
+  padding-top: 10px;
+}
+.drop-overlay {
+  position: absolute;
+  inset: 12px;
+  border: 2px dashed #78a58e;
+  border-radius: 15px;
+  background: #f2f8f4f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  color: #4b8366;
+  pointer-events: none;
+  z-index: 5;
+}
+.drop-overlay h2 {
+  font-size: 20px;
+  font-weight: 500;
+  margin-bottom: 3px;
+}
+.drop-overlay p {
+  color: #91aa9b;
+}
+@media (max-width: 960px) {
+  .sidebar {
+    width: 235px;
+  }
+  .main-header {
+    padding: 25px;
+  }
+  .activity-list {
+    padding-left: 25px;
+    padding-right: 25px;
+  }
+  .welcome h2 {
+    font-size: 30px;
+  }
+  .composer-actions > span {
+    display: none;
+  }
+  .download-location span {
+    max-width: 270px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}

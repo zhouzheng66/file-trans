@@ -1,0 +1,23 @@
+{
+  "name": "file-trans",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/desktop"
+  ],
+  "scripts": {
+    "dev": "node scripts/desktop.mjs dev",
+    "desktop:build": "node scripts/desktop.mjs build",
+    "build": "npm run build --workspace @file-trans/desktop",
+    "check": "npm run check --workspace @file-trans/desktop",
+    "test:core": "node scripts/rust.mjs test",
+    "check:rust": "node scripts/rust.mjs check --workspace",
+    "fmt": "node scripts/rust.mjs fmt --all",
+    "format": "prettier --write \"apps/desktop/src/**/*.{ts,tsx,css}\" \"scripts/*.mjs\"",
+    "format:check": "prettier --check \"apps/desktop/src/**/*.{ts,tsx,css}\" \"scripts/*.mjs\"",
+    "lint:rust": "node scripts/rust.mjs clippy --workspace --all-targets -- -D warnings"
+  },
+  "devDependencies": {
+    "prettier": "^3.10.1"
+  }
+}

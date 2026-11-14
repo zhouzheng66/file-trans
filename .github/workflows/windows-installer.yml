@@ -1,0 +1,41 @@
+name: Windows Installer
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Windows x64 installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci
+      - run: npm run desktop:build -- --bundles nsis
+      - name: Generate installer checksum
+        shell: pwsh
+        run: |
+          $installers = Get-ChildItem target/release/bundle/nsis/*-setup.exe
+          if (-not $installers) { throw 'Windows installer was not generated' }
+          foreach ($installer in $installers) {
+            $hash = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($installer.Name)" | Set-Content -Encoding ascii "$($installer.FullName).sha256"
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: file-trans-windows-x64-installer
+          path: |
+            target/release/bundle/nsis/*-setup.exe
+            target/release/bundle/nsis/*-setup.exe.sha256
+          if-no-files-found: error
+          retention-days: 30

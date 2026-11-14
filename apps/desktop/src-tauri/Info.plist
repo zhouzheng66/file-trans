@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>NSLocalNetworkUsageDescription</key><string>发现并连接你在局域网中的电脑，直接传输文件和文字。</string>
+  <key>NSBonjourServices</key><array><string>_filetrans._tcp</string></array>
+</dict></plist>

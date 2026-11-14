@@ -1,0 +1,25 @@
+[package]
+name = "file-trans-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+uuid.workspace = true
+sha2.workspace = true
+hex.workspace = true
+tracing.workspace = true
+file-trans-protocol.workspace = true
+file-trans-identity.workspace = true
+file-trans-discovery.workspace = true
+rusqlite = { version = "0.37", features = ["bundled"] }
+tempfile = "3"
+if-addrs = "0.14"
+
+[dev-dependencies]
+tempfile = "3"

@@ -1,0 +1,93 @@
+.welcome {
+  margin: auto;
+  padding: 35px 20px;
+  text-align: center;
+}
+.welcome-graphic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 34px;
+  position: relative;
+}
+.computer {
+  width: 94px;
+  height: 91px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #dce5df;
+  border-radius: 19px;
+  background: linear-gradient(150deg, #fff, #edf3ef);
+  color: #718d80;
+  transform: rotate(-7deg);
+  box-shadow: 0 9px 18px #3c5e4910;
+}
+.computer.second {
+  transform: rotate(7deg);
+  background: linear-gradient(150deg, #fff, #f1f4f6);
+  color: #7f939d;
+  border-color: #e1e6ea;
+  position: relative;
+}
+.computer.second > span {
+  position: absolute;
+  right: -5px;
+  bottom: 8px;
+  width: 23px;
+  height: 23px;
+  border: 3px solid #fcfdfd;
+  border-radius: 50%;
+  background: #5b967a;
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+.connection-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #89aa96;
+  padding: 0 12px;
+}
+.connection-line i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #c3d4ca;
+}
+.welcome-tag {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: #6d8a7c;
+  background: #eff5f0;
+  border-radius: 4px;
+  padding: 6px 9px;
+}
+.welcome h2 {
+  font-size: 34px;
+  line-height: 1.55;
+  letter-spacing: -1px;
+  font-weight: 550;
+  margin: 20px 0 13px;
+}
+.welcome h2 span {
+  color: #81978a;
+}
+.welcome p {
+  font-size: 12px;
+  color: #8b979e;
+  line-height: 1.95;
+  margin-bottom: 25px;
+}
+.welcome .button {
+  margin: 0 auto;
+}
+.welcome-steps {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 24px;
+  font-size: 9px;
+  color: #a0a9ae;
+  margin-top: 35px;
+}

@@ -205,6 +205,15 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# File Trans
+node_modules/
+.tooling/
+.local-data/
+*.db-wal
+*.db-shm
+.DS_Store
+apps/desktop/src-tauri/gen/
+
 # Ruff stuff:
 .ruff_cache/
 

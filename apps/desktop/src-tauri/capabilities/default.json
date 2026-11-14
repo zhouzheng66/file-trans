@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-capability",
+  "description": "主窗口可选择本地文件和目录，并在主动操作时复制文字。",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:allow-open", "dialog:allow-message", "clipboard-manager:allow-write-text"]
+}
