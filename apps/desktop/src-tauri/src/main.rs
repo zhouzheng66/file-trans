@@ -41,6 +41,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_snapshot,
+            commands::refresh_peer_connections,
             commands::set_network_settings,
             commands::create_invite,
             commands::pair_by_code,

@@ -1,6 +1,7 @@
 mod lan;
 mod network;
 mod pairing;
+mod reachability;
 mod server;
 mod transfer;
 mod transport;

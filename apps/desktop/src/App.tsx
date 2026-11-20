@@ -7,6 +7,7 @@ import { sendPaths } from './hooks/sendPaths';
 import { PairingDialog } from './components/PairingDialog';
 import { ActivityList } from './components/ActivityList';
 import { DeviceSidebar } from './components/DeviceSidebar';
+import type { ConnectionResults } from './components/PairedDeviceList';
 import { Composer } from './components/Composer';
 import { Welcome } from './components/Welcome';
 import { NetworkPanel } from './components/NetworkPanel';
@@ -93,6 +94,7 @@ export default function App() {
         selected={selected}
         manual={manual}
         connecting={connecting}
+        onRefresh={() => run<ConnectionResults>('refresh_peer_connections')}
         onSelect={setSelected}
         onToggleManual={() => setManual(!manual)}
         onDelete={(id, name) => ignore(forgetPeer(id, name))}

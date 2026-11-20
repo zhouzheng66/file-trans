@@ -1,5 +1,5 @@
 use crate::AppState;
-use file_trans_core::model::{NetworkSettings, Snapshot};
+use file_trans_core::model::{NetworkSettings, Route, Snapshot};
 use file_trans_core::transfers::TransferKey;
 use std::path::PathBuf;
 use tauri::State;
@@ -29,6 +29,13 @@ pub async fn pair_by_code(state: State<'_, AppState>, code: String) -> Result<St
 #[tauri::command]
 pub fn get_snapshot(state: State<'_, AppState>) -> Result<Snapshot, String> {
     state.0.snapshot().map_err(error)
+}
+
+#[tauri::command]
+pub async fn refresh_peer_connections(
+    state: State<'_, AppState>,
+) -> Result<std::collections::HashMap<String, Option<Route>>, String> {
+    state.0.refresh_peer_connections().await.map_err(error)
 }
 
 #[tauri::command]

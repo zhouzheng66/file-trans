@@ -175,9 +175,17 @@ async fn auto_prefers_lan_falls_back_and_respects_forced_modes() -> Result<()> {
     let id = a.request_pair(b.local_address()).await?;
     confirm(&a, &b, &id).await;
     eventually(|| a.relay_status().state == "online" && b.relay_status().state == "online").await;
+    assert_eq!(
+        a.refresh_peer_connections().await?[&b.local().id],
+        Some(Route::Lan)
+    );
     a.send_text(&b.local().id, "自动优先局域网".into()).await?;
     assert_eq!(a.snapshot()?.activities[0].route, Some(Route::Lan));
     mode(&a, NetworkMode::Internet).await;
+    assert_eq!(
+        a.refresh_peer_connections().await?[&b.local().id],
+        Some(Route::Relay)
+    );
     a.send_text(&b.local().id, "强制中继".into()).await?;
     assert_eq!(a.snapshot()?.activities[0].route, Some(Route::Relay));
     mode(&a, NetworkMode::Auto).await;
@@ -187,6 +195,7 @@ async fn auto_prefers_lan_falls_back_and_respects_forced_modes() -> Result<()> {
     assert_eq!(a.snapshot()?.activities[0].route, Some(Route::Relay));
     let count = b.snapshot()?.activities.len();
     mode(&a, NetworkMode::Lan).await;
+    assert_eq!(a.refresh_peer_connections().await?[&b.local().id], None);
     assert_eq!(a.relay_status().state, "disabled");
     assert!(a
         .send_text(&b.local().id, "不得走互联网".into())

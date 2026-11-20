@@ -1,6 +1,6 @@
 {
   "name": "file-trans",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "private": true,
   "workspaces": [
     "apps/desktop"

@@ -1,17 +1,11 @@
 import { useState } from 'react';
 import { ArrowDownUp, ArrowRight, Laptop, Monitor, Plus, ShieldCheck, Wifi } from 'lucide-react';
-import type { Snapshot } from '../types';
 import { version } from '../../package.json';
-import { DeviceMenu } from './DeviceMenu';
+import { PairedDeviceList, type PairedDeviceListProps } from './PairedDeviceList';
 
-interface Props {
-  snapshot: Snapshot | null;
-  selected: string | null;
+interface Props extends PairedDeviceListProps {
   manual: boolean;
   connecting: boolean;
-  onSelect: (id: string) => void;
-  onToggleManual: () => void;
-  onDelete: (id: string, name: string) => void;
   onPair: (addresses: string | string[]) => void;
 }
 
@@ -20,6 +14,7 @@ export function DeviceSidebar({
   selected,
   manual,
   connecting,
+  onRefresh,
   onSelect,
   onToggleManual,
   onDelete,
@@ -57,47 +52,15 @@ export function DeviceSidebar({
           <span>此电脑 · 无需登录</span>
         </div>
       </div>
-      <div className="section-title">
-        <span>我的设备</span>
-        <button
-          className="icon-button"
-          aria-label="手动添加设备"
-          title="手动添加设备"
-          onClick={onToggleManual}
-        >
-          <Plus size={17} />
-        </button>
-      </div>
-      <div className="peer-list">
-        {snapshot?.peers.map((device) => {
-          const discovered = snapshot.discovered.some((found) => found.id === device.id);
-          return (
-            <div className="peer-row" key={device.id}>
-              <button
-                className={`peer-button ${selected === device.id ? 'selected' : ''}`}
-                onClick={() => onSelect(device.id)}
-              >
-                <Monitor size={22} />
-                <span>
-                  <strong title={device.name}>{device.name}</strong>
-                  <small>
-                    <i className={discovered ? 'dot online' : 'dot'} />
-                    {discovered ? '局域网已发现' : '已配对 · 可尝试连接'}
-                  </small>
-                </span>
-              </button>
-              <DeviceMenu name={device.name} onDelete={() => onDelete(device.id, device.name)} />
-            </div>
-          );
-        })}
-        {snapshot?.peers.length === 0 && (
-          <p className="sidebar-note">
-            添加另一台电脑，
-            <br />
-            开始你的第一次传输。
-          </p>
-        )}
-      </div>
+      <PairedDeviceList
+        key={JSON.stringify([snapshot?.network.mode, snapshot?.network.relayUrl])}
+        snapshot={snapshot}
+        selected={selected}
+        onRefresh={onRefresh}
+        onSelect={onSelect}
+        onDelete={onDelete}
+        onToggleManual={onToggleManual}
+      />
       {unpaired.length > 0 && snapshot?.network.mode !== 'internet' && (
         <>
           <div className="section-title">
