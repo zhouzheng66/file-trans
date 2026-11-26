@@ -1,6 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod file_drag;
+mod media_preview;
 mod received_files;
 
 use file_trans_core::{Engine, EngineConfig};
@@ -56,6 +58,8 @@ fn main() {
             commands::cancel_transfer,
             commands::forget_peer,
             commands::set_download_dir,
+            file_drag::start_file_drag,
+            media_preview::prepare_media_preview,
             received_files::open_received_location
         ])
         .build(tauri::generate_context!())

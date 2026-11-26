@@ -9,10 +9,30 @@ default-run = "file-trans-desktop"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-opener = "2"
 file-trans-core.workspace = true
 file-trans-identity.workspace = true
 hostname = "0.4"
+
+[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
+drag = "2.1.1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+axum = "0.8"
+hex.workspace = true
+ring = "0.17"
+tokio.workspace = true
+tower-http = { version = "0.6", features = ["fs"] }
+
+[dev-dependencies]
+axum = "0.8"
+hex.workspace = true
+ring = "0.17"
+rusqlite = { version = "0.37", features = ["bundled"] }
+tempfile = "3"
+tokio.workspace = true
+tower-http = { version = "0.6", features = ["fs"] }

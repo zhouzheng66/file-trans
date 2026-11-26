@@ -1,4 +1,7 @@
-use crate::model::{Activity, Peer};
+use crate::{
+    model::{Activity, Peer},
+    transfers::TransferKey,
+};
 use anyhow::{ensure, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::{path::Path, sync::Mutex};
@@ -87,6 +90,21 @@ impl Store {
             .into_iter()
             .map(|json| Ok(serde_json::from_str(&json)?))
             .collect()
+    }
+
+    pub(crate) fn activity(&self, key: &TransferKey) -> Result<Option<Activity>> {
+        let data: Option<String> = self
+            .0
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT data FROM activities WHERE id=?1 AND direction=?2 AND peer_id=?3",
+                params![key.id, key.direction.as_str(), key.peer_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        data.map(|data| Ok(serde_json::from_str(&data)?))
+            .transpose()
     }
 
     pub fn received(&self, id: &str, peer_id: &str) -> Result<bool> {

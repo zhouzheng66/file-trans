@@ -1,28 +1,9 @@
-import {
-  CheckCheck,
-  Copy,
-  File,
-  Folder,
-  FolderOpen,
-  ArrowDownLeft,
-  ArrowUpRight,
-} from 'lucide-react';
+import { Copy, FolderOpen, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import type { Activity, Peer } from '../types';
 import { useEffect, useRef } from 'react';
 import { TransferActions } from './TransferActions';
-
-export function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ['KiB', 'MiB', 'GiB', 'TiB'];
-  let value = bytes / 1024;
-  let index = 0;
-  while (value >= 1024 && index < units.length - 1) {
-    value /= 1024;
-    index++;
-  }
-  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[index]}`;
-}
+import { FileCard } from './FileCard';
 
 const statuses: Record<string, string> = {
   connecting: '正在连接',
@@ -43,13 +24,21 @@ interface Props {
   activities: Activity[];
   peers: Peer[];
   onError: (message: string) => void;
+  onDragFile: (activity: Activity) => void;
   onReveal: (activity: Activity) => Promise<unknown>;
   onTransferAction: (
     activity: Activity,
     action: 'pause_transfer' | 'resume_transfer' | 'cancel_transfer',
   ) => void;
 }
-export function ActivityList({ activities, peers, onError, onReveal, onTransferAction }: Props) {
+export function ActivityList({
+  activities,
+  peers,
+  onError,
+  onReveal,
+  onDragFile,
+  onTransferAction,
+}: Props) {
   const end = useRef<HTMLDivElement>(null);
   const latest = activities.at(-1)?.id;
   useEffect(() => {
@@ -62,11 +51,6 @@ export function ActivityList({ activities, peers, onError, onReveal, onTransferA
         const peer = peers.find((peer) => peer.id === activity.peerId);
         const route =
           activity.route === 'lan' ? '局域网直连' : activity.route === 'relay' ? '互联网中继' : '';
-        const progress = activity.size
-          ? Math.min(100, (activity.transferred / activity.size) * 100)
-          : activity.status === 'completed'
-            ? 100
-            : 0;
         return (
           <article
             className={`activity ${incoming ? 'incoming' : 'outgoing'}`}
@@ -99,48 +83,12 @@ export function ActivityList({ activities, peers, onError, onReveal, onTransferA
                 </button>
               </div>
             ) : (
-              <div className="file-card">
-                <div className="file-icon">
-                  {activity.kind === 'folder' ? <Folder size={23} /> : <File size={23} />}
-                </div>
-                <div className="file-details">
-                  <strong>
-                    {activity.content}
-                    {activity.kind === 'folder' && ' · 文件夹'}
-                  </strong>
-                  <span>
-                    {activity.kind === 'folder' && activity.status === 'preparing' && !activity.size
-                      ? '大小统计中'
-                      : formatSize(activity.size)}{' '}
-                    ·{' '}
-                    {activity.kind === 'folder' && activity.status === 'preparing'
-                      ? '正在准备目录快照'
-                      : (statuses[activity.status] ?? activity.status)}
-                    {route && ` · ${route}`}
-                  </span>
-                  {!['completed', 'failed', 'rejected', 'cancelled', 'awaiting_accept'].includes(
-                    activity.status,
-                  ) && (
-                    <>
-                      <progress max={100} value={progress} />
-                      <span>
-                        {formatSize(activity.transferred)} / {formatSize(activity.size)}
-                      </span>
-                    </>
-                  )}
-                  {activity.resumedFrom > 0 && (
-                    <small className="saved-path">
-                      已从 {formatSize(activity.resumedFrom)} 断点继续
-                    </small>
-                  )}
-                  {incoming && activity.status === 'completed' && (
-                    <small className="saved-path" title={activity.path ?? ''}>
-                      {activity.path}
-                    </small>
-                  )}
-                </div>
-                {activity.status === 'completed' && <CheckCheck className="success" size={19} />}
-              </div>
+              <FileCard
+                activity={activity}
+                route={route}
+                statusLabel={statuses[activity.status] ?? activity.status}
+                onDragFile={onDragFile}
+              />
             )}
             {incoming &&
               activity.kind !== 'text' &&

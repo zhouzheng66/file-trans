@@ -76,10 +76,18 @@ async fn automatically_receives_files_and_folders_on_both_routes_in_a_persisted_
         }
         for path in [&source, &folder] {
             let id = a.send_path(&b.local().id, path.to_path_buf()).await?;
+            assert_eq!(
+                a.local_attachment_path(&key(&a, &b, &id, Direction::Outgoing))?,
+                path.canonicalize()?
+            );
             completed(&a, &b, &id).await;
             let received = activity(&b, &id, "incoming");
             assert_eq!(received.route, Some(route));
             let saved = std::path::PathBuf::from(received.path.unwrap());
+            assert_eq!(
+                b.local_attachment_path(&key(&b, &a, &id, Direction::Incoming))?,
+                saved
+            );
             assert_eq!(saved.parent(), Some(directory.as_path()));
             if path == &source {
                 assert_eq!(tokio::fs::read(saved).await?, [0, 1, 128, 255]);
@@ -133,6 +141,9 @@ async fn automatic_receipt_keeps_its_directory_and_offset_after_pause_restart_an
     eventually(|| proxy.active.load(Ordering::SeqCst) == 0).await;
     let offset = activity(&b, &id, "incoming").transferred;
     assert!(offset > 0);
+    assert!(b
+        .local_attachment_path(&key(&b, &a, &id, Direction::Incoming))
+        .is_err());
     let new_directory = root.path().join("新的接收目录");
     b.set_download_dir(new_directory.clone()).await?;
     b.shutdown().await;
@@ -206,6 +217,17 @@ async fn legacy_sender_is_auto_accepted_but_revoked_and_unknown_devices_are_not(
         read_message(&mut stream).await?,
         Message::Ack { .. }
     ));
+    let attachment = key(&b, &a, &id, Direction::Incoming);
+    let path = b.local_attachment_path(&attachment)?;
+    assert_eq!(path, root.path().join("B/received/legacy.bin"));
+    assert!(b
+        .local_attachment_path(&key(&b, &b, &id, Direction::Incoming))
+        .is_err());
+    assert!(b
+        .local_attachment_path(&key(&b, &a, &id, Direction::Outgoing))
+        .is_err());
+    tokio::fs::remove_file(path).await?;
+    assert!(b.local_attachment_path(&attachment).is_err());
     b.forget_peer(&a.local().id)?;
     for identity in [&ai, &Identity::generate()?] {
         let mut stream = connect(

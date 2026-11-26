@@ -3,6 +3,7 @@ import { ask, open } from '@tauri-apps/plugin-dialog';
 import { ArrowDownUp, Link2, ShieldCheck, X } from 'lucide-react';
 import { useEngine } from './hooks/useEngine';
 import { useDropFiles } from './hooks/useDropFiles';
+import { transferKey } from './attachments';
 import { sendPaths } from './hooks/sendPaths';
 import { PairingDialog } from './components/PairingDialog';
 import { ActivityList } from './components/ActivityList';
@@ -23,7 +24,7 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(null);
   const [manual, setManual] = useState(false);
   const [connecting, setConnecting] = useState(false);
-  const dragging = useDropFiles(selected, run, setError);
+  const { dragging, startFileDrag } = useDropFiles(selected, run, setError);
   const peer = snapshot?.peers.find((peer) => peer.id === selected);
   const pairing = snapshot?.pairings.find((pairing) =>
     ['pending', 'waiting_peer'].includes(pairing.status),
@@ -158,19 +159,12 @@ export default function App() {
                   activities={activities}
                   peers={snapshot!.peers}
                   onError={setError}
+                  onDragFile={startFileDrag}
                   onReveal={(activity) =>
                     run('open_received_location', { id: activity.id, peerId: activity.peerId })
                   }
                   onTransferAction={(activity, command) =>
-                    ignore(
-                      run(command, {
-                        key: {
-                          id: activity.id,
-                          peerId: activity.peerId,
-                          direction: activity.direction,
-                        },
-                      }),
-                    )
+                    ignore(run(command, { key: transferKey(activity) }))
                   }
                 />
               ) : (
